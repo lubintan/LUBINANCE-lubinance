@@ -1,11 +1,9 @@
 from analyzerFunctions import *
 from testInfo import *
+import csv
 
 
 def main(dataFile,begin,end):
-
-    print()
-
     print('Processing New Data Set:', dataFile)
 
 
@@ -35,64 +33,34 @@ def main(dataFile,begin,end):
     df['vol'] = pd.to_numeric(df['vol'])
     df = df.reset_index(drop=True)
 
-    # only retain data for last 5 years
-    # df = df[df.date > (df.iloc[-1].date-timedelta(days=(365.25*2)))]
-    # df = df.reset_index(drop=True)
-
-    # cutoff = len(df) - 0
-
-    # dfTail = df[cutoff:]
-    # df = df[:cutoff]
-
-    # todaysDate = df.iloc[-1].date
-
-    # endpoint = todaysDate + timedelta(weeks=0)
-    #
-    # showDate = todaysDate - timedelta(weeks=0)
-    #
-    # showXaxisRange = [showDate,
-    #                   # df.iloc[-154].date,
-    #                   endpoint]
-
-
-
-
-
+       #
     # region: add lowFirst column if no timing data
     if 'lowFirst' not in df.columns: df['lowFirst'] = df.open < df.close
+    df = pd.DataFrame(df.iloc[:]).reset_index(drop=True)
     # endregion
-    df = pd.DataFrame(df.iloc[0:]).reset_index(drop=True)
-
     trendLine1, trendLine2, trendLine3 = getActiveTrend(df)
 
-    #### TRENDLINE PROCESSING  END #####
-
-    # topAndBottomPoints, HH_bars, LL_bars, HL_bars, LH_bars
-    # minorStuff = getTrendTopsAndBottoms(trendLine1, df)
-    # intermediateStuff = getTrendTopsAndBottoms(trendLine2, df)
-    # majorStuff = getTrendTopsAndBottoms(trendLine3, df)
-
     # region:all bars
-    allBars = Ohlc(name='All Bars', x=df.date, open=df.open,
-                   close=df.close, high=df.high, low=df.low,
-                   opacity=0.8,
-                   line=dict(width=2.5),
-                   # hoverinfo='none',
-                   hoverlabel=dict(bgcolor='pink'),
-
-                   # showlegend=False,
-                   # increasing=dict(line=dict(color= '#17BECF')),
-                   # decreasing=dict(line=dict(color= '#17BECF')),
-                   # increasing=dict(line=dict(color='black')),
-                   # decreasing=dict(line=dict(color='black')),
-                   )
+    # allBars = Ohlc(name='All Bars', x=df.date, open=df.open,
+    #                close=df.close, high=df.high, low=df.low,
+    #                opacity=0.8,
+    #                line=dict(width=2.5),
+    #                # hoverinfo='none',
+    #                hoverlabel=dict(bgcolor='pink'),
+    #
+    #                # showlegend=False,
+    #                # increasing=dict(line=dict(color= '#17BECF')),
+    #                # decreasing=dict(line=dict(color= '#17BECF')),
+    #                # increasing=dict(line=dict(color='black')),
+    #                # decreasing=dict(line=dict(color='black')),
+    #                )
     # endregion
 
 
 
-    # region:trendlines
+    # region:trendlines plotting
     # plot minor trendline points and lines
-    minor= plotTrendlines(trendLine1, name='Minor', color='brown', width=3)
+    # minor= plotTrendlines(trendLine1, name='Minor', color='brown', width=3)
 
     # # plot intermediate trendline points and lines
     # intermediate, intermediateTops, intermediateBottoms = plotTrendlines(trendLine2, intermediateStuff,
@@ -100,28 +68,23 @@ def main(dataFile,begin,end):
     #
     # major, majorTops, majorBottoms = plotTrendlines(trendLine3, majorStuff, name='Major', color='navy', width=4)
 
-    # region: major data to plot
-    majorData = [
-        allBars,
-        # tailBars,
-        # major,
-        # intermediate,
-        minor,
-        # majorTops, majorBottoms,
-        # intermediateTops, intermediateBottoms,
-        # minorTops, minorBottoms
-
-    ]
-
+    # # region: major data to plot
+    # majorData = [
+    #     allBars,
+    #     # minor,
+    #     ]
+    #
     # majorFig = Figure(data=majorData,
-    #                   layout=Layout(xaxis=dict(
+    #                   layout=Layout(title=dataFile,xaxis=dict(
     #         rangeslider=dict(
     #             visible=False
     #         ),)))
     # plotly.offline.plot(majorFig)
+    #endregion
 
 
 
+    #region: analysis
 
     # dataPoints = []
     startDate = datetime(year=2015,month=1,day=1,hour=0,minute=0)
@@ -198,7 +161,9 @@ def main(dataFile,begin,end):
             # print('startDate', startDate)
 
     print('end assetsUSD:', assets)
-    print('end assetsBTC:', btcAssets, '=', btcAssets * df.iloc[-1].close, 'USD')
+    print('end assetsBTC:', btcAssets, '=', btcAssets * df.iloc[-1].close, 'USDT')
+
+    totalHoldings = assets + (btcAssets * df.iloc[-1].close)
 
     days = (df.iloc[-1].date - df.iloc[0].date).days
 
@@ -207,102 +172,236 @@ def main(dataFile,begin,end):
     # log(1.n) = log(1.totalN)/days
     # 1.n = 10^(log(1.totalN)/days)
 
-    totalPercentage = (assets + btcAssets * df.iloc[-1].close) / startingUSD
+    totalPercentage = (totalHoldings) / startingUSD
     dailyRate = 10 ** (np.log10(totalPercentage) / days)
 
     print('total %:', totalPercentage, 'daily %:', dailyRate, 'days:', days)
 
-    print('projected monthly rate:', 100 * ((dailyRate ** 30) - 1), '%')
-    print('projected annual rate:', 100 * ((dailyRate ** 365) - 1), '%')
+    monthlyRate = 100 * ((dailyRate ** 30) - 1)
+    annualRate = 100 * ((dailyRate ** 365) - 1)
+
+    print('projected monthly rate:',monthlyRate , '%')
+    print('projected annual rate:', annualRate , '%')
 
 
 
 
 
-
-
-
-    #
-
-    startingUSD = float(1e2)
-    assets = startingUSD
-    btcAssets = 0
-    txFee = 0.002  # 0.22%
-
-    minorStuff = getTrendTopsAndBottoms(trendLine1, df)
-
-
-    trend = trendLine1[:]  # minor,int, major
-
-    print('start assetsUSDT: ', assets)
-    print('start assetsBTC: ', btcAssets)
-
-    for i, r in trend.iterrows():
-        # print(i,'---------------')
-        if i == len(trend) - 2: break
-        if trend.iloc[i + 1].date == r.date:
-            iii = 2
-        else:
-            iii = 1
-
-        if r.bottom:
-            if assets == 0: continue
-
-            buyPrice = df.iloc[trend.iloc[i + iii].barIndex].close
-            btcAssets = assets / buyPrice
-            assets = 0
-            btcAssets = np.round(btcAssets * (1 - txFee), 3)
-            # print(str(trend.iloc[i + iii].date)[:10], 'buy at:', buyPrice, 'assets:', btcAssets, 'BTC')
-
-        elif r.top:
-            if btcAssets == 0: continue
-
-
-            sellPrice = df.iloc[trend.iloc[i + iii].barIndex].close
-            assets = btcAssets * sellPrice
-            btcAssets = 0
-            assets = np.round(assets * (1 - txFee), 3)
-            # print(str(trend.iloc[i + iii].date)[:10], 'sell at:', sellPrice, 'assets:', assets, 'USD')
-
-    print('end assetsUSD:', assets)
-    print('end assetsBTC:', btcAssets, '=', btcAssets * df.iloc[-1].close, 'USD')
-
-    days = (df.iloc[-1].date - df.iloc[0].date).days
-
-    # (1.n)^days = 1.totalN
-    # days * log(1.n) = log(1.totalN)
-    # log(1.n) = log(1.totalN)/days
-    # 1.n = 10^(log(1.totalN)/days)
-
-    totalPercentage = (assets + btcAssets * df.iloc[-1].close) / startingUSD
-    dailyRate = 10 ** (np.log10(totalPercentage) / days)
-
-    print('total %:', totalPercentage, 'daily %:', dailyRate, 'days:', days)
-
-    print('projected monthly rate:', 100 * ((dailyRate ** 30) - 1), '%')
-    print('projected annual rate:', 100 * ((dailyRate ** 365) - 1), '%')
-
-
-
-
-
-    return
+    return annualRate, monthlyRate, days, totalHoldings
 
 
 def timeCounterWrapper(dataFile, begin, end):
     startTime = time.time()
 
-    main(dataFile, begin, end)
+    annualRate, monthlyRate, numOfDays,finalBalance = main(dataFile, begin, end)
 
     endTime = time.time()
     elapsed = endTime - startTime
     print("Operation took a total of %.2f seconds." % (elapsed))
     print()
 
+    return annualRate, monthlyRate, numOfDays, finalBalance
+
+    time.sleep(2)
+
 
 if __name__ == '__main__':
 
-    timeCounterWrapper(BTCUSDT['datasets'][1], datetime(2019,1,1),datetime(2019,1,5))
+    OVERALL_START = time.time()
+
+    numTrends = 4.0
+
+    with open(
+            "{}_{}.csv".format(
+                'lubinanaceSimData100USDT',
+                time.time()
+            ),
+            mode='w+'  # set file write mode
+    ) as f:
+        writer = csv.writer(f)
+        writer.writerow(['Crypto Pair', 'Interval', 'Trend','Annual Rate', 'Monthly Rate', 'Final Balance','Sample Days', 'Sample Start', 'Sample End'])
+
+        for eachData in allData:
+
+            dataFile = eachData['datasets'][0]
+            eachData['1mResults']={}
+            totalAnnualRate = 0
+            totalMonthlyRate = 0
+            totalNumDays = 0
+            totalBalance = 0
+
+            annualRate, monthlyRate, numOfDays, finalBalance = timeCounterWrapper(dataFile, eachData['uptrendDates'][0],
+                                                                                  eachData['uptrendDates'][1])
+            writer.writerow([eachData['name'], '1m', 'up', annualRate, monthlyRate, finalBalance, numOfDays,
+                             eachData['uptrendDates'][0], eachData['uptrendDates'][1]])
+            totalAnnualRate += annualRate
+            totalMonthlyRate += monthlyRate
+            totalBalance += finalBalance
+            totalNumDays += numOfDays
+            # eachData['1mResults']['uptrendResults'] = dict(annualRate=annualRate, monthlyRate=monthlyRate, numOfDays=numOfDays,
+            #                                               finalBalance=finalBalance)
+
+            annualRate, monthlyRate, numOfDays, finalBalance = timeCounterWrapper(dataFile, eachData['downtrendDates'][0],
+                                                                                  eachData['downtrendDates'][1])
+            writer.writerow([eachData['name'], '1m', 'down', annualRate, monthlyRate, finalBalance, numOfDays,
+                             eachData['downtrendDates'][0], eachData['downtrendDates'][1]])
+            totalAnnualRate += annualRate
+            totalMonthlyRate += monthlyRate
+            totalBalance += finalBalance
+            totalNumDays += numOfDays
+            # eachData['1mResults']['downtrendResults'] = dict(annualRate=annualRate, monthlyRate=monthlyRate, numOfDays=numOfDays,
+            #                                                 finalBalance=finalBalance)
+
+            annualRate, monthlyRate, numOfDays, finalBalance = timeCounterWrapper(dataFile, eachData['sidewaysDates'][0],
+                                                                                  eachData['sidewaysDates'][1])
+            writer.writerow([eachData['name'], '1m', 'sideways', annualRate, monthlyRate, finalBalance, numOfDays,
+                             eachData['sidewaysDates'][0], eachData['sidewaysDates'][1]])
+            totalAnnualRate += annualRate
+            totalMonthlyRate += monthlyRate
+            totalBalance += finalBalance
+            totalNumDays += numOfDays
+            # eachData['1mResults']['sidewaysResults'] = dict(annualRate=annualRate, monthlyRate=monthlyRate, numOfDays=numOfDays,
+            #                                                finalBalance=finalBalance)
+
+            annualRate, monthlyRate, numOfDays, finalBalance = timeCounterWrapper(dataFile, eachData['randomDates'][0],
+                                                                                  eachData['randomDates'][1])
+            writer.writerow([eachData['name'], '1m', 'random', annualRate, monthlyRate, finalBalance, numOfDays,
+                             eachData['randomDates'][0], eachData['randomDates'][1]])
+            totalAnnualRate += annualRate
+            totalMonthlyRate += monthlyRate
+            totalBalance += finalBalance
+            totalNumDays += numOfDays
+            # eachData['1mResults']['randomResults'] = dict(annualRate=annualRate, monthlyRate=monthlyRate, numOfDays=numOfDays,
+            #                                              finalBalance=finalBalance)
 
 
+
+            writer.writerow([eachData['name'], '1m', 'Average', totalAnnualRate/numTrends, totalMonthlyRate/numTrends, totalBalance/numTrends, totalNumDays/numTrends,
+                             0, 0])
+
+    ##########################################################
+            dataFile = eachData['datasets'][1]
+            eachData['5mResults'] = {}
+            totalAnnualRate = 0
+            totalMonthlyRate = 0
+            totalNumDays = 0
+            totalBalance = 0
+
+            annualRate, monthlyRate, numOfDays, finalBalance = timeCounterWrapper(dataFile, eachData['uptrendDates'][0],
+                                                                                  eachData['uptrendDates'][1])
+            writer.writerow([eachData['name'], '5m', 'up', annualRate, monthlyRate, finalBalance, numOfDays,
+                             eachData['uptrendDates'][0], eachData['uptrendDates'][1]])
+            totalAnnualRate += annualRate
+            totalMonthlyRate += monthlyRate
+            totalBalance += finalBalance
+            totalNumDays += numOfDays
+            # eachData['5mResults']['uptrendResults'] = dict(annualRate=annualRate, monthlyRate=monthlyRate,
+            #                                               numOfDays=numOfDays,
+            #                                               finalBalance=finalBalance)
+
+            annualRate, monthlyRate, numOfDays, finalBalance = timeCounterWrapper(dataFile, eachData['downtrendDates'][0],
+                                                                                  eachData['downtrendDates'][1])
+            writer.writerow([eachData['name'], '5m', 'down', annualRate, monthlyRate, finalBalance, numOfDays,
+                             eachData['downtrendDates'][0], eachData['downtrendDates'][1]])
+            totalAnnualRate += annualRate
+            totalMonthlyRate += monthlyRate
+            totalBalance += finalBalance
+            totalNumDays += numOfDays
+            # eachData['5mResults']['downtrendResults'] = dict(annualRate=annualRate, monthlyRate=monthlyRate,
+            #                                                 numOfDays=numOfDays,
+            #                                                 finalBalance=finalBalance)
+
+            annualRate, monthlyRate, numOfDays, finalBalance = timeCounterWrapper(dataFile, eachData['sidewaysDates'][0],
+                                                                                  eachData['sidewaysDates'][1])
+            writer.writerow([eachData['name'], '5m', 'sideways', annualRate, monthlyRate, finalBalance, numOfDays,
+                             eachData['sidewaysDates'][0], eachData['sidewaysDates'][1]])
+            totalAnnualRate += annualRate
+            totalMonthlyRate += monthlyRate
+            totalBalance += finalBalance
+            totalNumDays += numOfDays
+            # eachData['5mResults']['sidewaysResults'] = dict(annualRate=annualRate, monthlyRate=monthlyRate,
+            #                                                numOfDays=numOfDays,
+            #                                                finalBalance=finalBalance)
+
+            annualRate, monthlyRate, numOfDays, finalBalance = timeCounterWrapper(dataFile, eachData['randomDates'][0],
+                                                                                  eachData['randomDates'][1])
+            writer.writerow([eachData['name'], '5m', 'random', annualRate, monthlyRate, finalBalance, numOfDays,
+                             eachData['randomDates'][0], eachData['randomDates'][1]])
+            totalAnnualRate += annualRate
+            totalMonthlyRate += monthlyRate
+            totalBalance += finalBalance
+            totalNumDays += numOfDays
+            # eachData['5mResults']['randomResults'] = dict(annualRate=annualRate, monthlyRate=monthlyRate,
+            #                                              numOfDays=numOfDays,
+            #                                              finalBalance=finalBalance)
+
+            writer.writerow(
+                [eachData['name'], '5m', 'Average', totalAnnualRate / numTrends, totalMonthlyRate / numTrends,
+                 totalBalance / numTrends, totalNumDays / numTrends,
+                 0, 0])
+
+            ################################################################################################
+            dataFile = eachData['datasets'][2]
+            eachData['15mResults'] = {}
+            totalAnnualRate = 0
+            totalMonthlyRate = 0
+            totalNumDays = 0
+            totalBalance = 0
+
+            annualRate, monthlyRate, numOfDays, finalBalance = timeCounterWrapper(dataFile, eachData['uptrendDates'][0],
+                                                                                  eachData['uptrendDates'][1])
+            writer.writerow([eachData['name'], '15m', 'up', annualRate, monthlyRate, finalBalance, numOfDays,
+                             eachData['uptrendDates'][0], eachData['uptrendDates'][1]])
+            totalAnnualRate += annualRate
+            totalMonthlyRate += monthlyRate
+            totalBalance += finalBalance
+            totalNumDays += numOfDays
+            # eachData['15mResults']['uptrendResults'] = dict(annualRate=annualRate, monthlyRate=monthlyRate,
+            #                                               numOfDays=numOfDays,
+            #                                               finalBalance=finalBalance)
+
+            annualRate, monthlyRate, numOfDays, finalBalance = timeCounterWrapper(dataFile, eachData['downtrendDates'][0],
+                                                                                  eachData['downtrendDates'][1])
+            writer.writerow([eachData['name'], '15m', 'down', annualRate, monthlyRate, finalBalance, numOfDays,
+                             eachData['downtrendDates'][0], eachData['downtrendDates'][1]])
+            totalAnnualRate += annualRate
+            totalMonthlyRate += monthlyRate
+            totalBalance += finalBalance
+            totalNumDays += numOfDays
+            # eachData['15mResults']['downtrendResults'] = dict(annualRate=annualRate, monthlyRate=monthlyRate,
+            #                                                 numOfDays=numOfDays,
+            #                                                 finalBalance=finalBalance)
+
+            annualRate, monthlyRate, numOfDays, finalBalance = timeCounterWrapper(dataFile, eachData['sidewaysDates'][0],
+                                                                                  eachData['sidewaysDates'][1])
+            writer.writerow([eachData['name'], '15m', 'sideways', annualRate, monthlyRate, finalBalance, numOfDays,
+                             eachData['sidewaysDates'][0], eachData['sidewaysDates'][1]])
+            totalAnnualRate += annualRate
+            totalMonthlyRate += monthlyRate
+            totalBalance += finalBalance
+            totalNumDays += numOfDays
+            # eachData['15mResults']['sidewaysResults'] = dict(annualRate=annualRate, monthlyRate=monthlyRate,
+            #                                                numOfDays=numOfDays,
+            #                                                finalBalance=finalBalance)
+
+            annualRate, monthlyRate, numOfDays, finalBalance = timeCounterWrapper(dataFile, eachData['randomDates'][0],
+                                                                                  eachData['randomDates'][1])
+            writer.writerow([eachData['name'], '15m', 'random', annualRate, monthlyRate, finalBalance, numOfDays,
+                             eachData['randomDates'][0], eachData['randomDates'][1]])
+            totalAnnualRate += annualRate
+            totalMonthlyRate += monthlyRate
+            totalBalance += finalBalance
+            totalNumDays += numOfDays
+            # eachData['15mResults']['randomResults'] = dict(annualRate=annualRate, monthlyRate=monthlyRate,
+            #                                              numOfDays=numOfDays,
+            #                                              finalBalance=finalBalance)
+
+            writer.writerow(
+                [eachData['name'], '15m', 'Average', totalAnnualRate / numTrends, totalMonthlyRate / numTrends,
+                 totalBalance / numTrends, totalNumDays / numTrends,
+                 0, 0])
+
+    ELAPSED = time.time() - OVERALL_START
+
+    print("WHOLE OPERATION took a total of %.2f seconds." % (ELAPSED))
 
