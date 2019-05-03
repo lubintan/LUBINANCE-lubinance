@@ -125,6 +125,7 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                     now = time.time()
                     if (now-buyTime) > 10: # if waited more than
                         cancelled = cancel_order(client,pair,buyId)
+                        btcAssets = 0
                         writeToFile(fileName,'CANCELLED BUY:'+str(currentDate)+' | price: '+currentPrice)
                         print('CANCELLED BUY','Price:',currentPrice)
                         print(cancelled)
