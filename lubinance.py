@@ -61,7 +61,7 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
 
             currentDate = datetime.utcnow()
             line = str(
-                currentDate) + ' BUY AT: ' + ' | current assets: ' + str(btcAssets) + ' ' + coin + ' | buy trigger: ' + str(buyTrigger) + ' | total USDT txed: ' + str(totalUSDTtxed)
+                currentDate) + ' ' + coin+  ' price: '+ str(currentPrice) + ' | buy trigger: ' + str(buyTrigger) + ' | Target Sell: ' + str(highThreshold)
 
             print(line)
             # writeToFile(fileName,line)
@@ -116,6 +116,8 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                 totalUSDTtxed += btcAssets * buyPrice
 
                 line = str(currentDate) + ' BUY AT: ' + str(buyPrice) + ' | current assets: ' + str(btcAssets) +' '+coin+' | buy trigger: '+str(buyTrigger) + ' | total USDT txed: ' + str(totalUSDTtxed)
+
+                highThreshold = sellTriggerRatio * lastBuyPrice
 
                 print('***')
                 print(line)
@@ -261,5 +263,5 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
 
 
 if __name__ == '__main__':
-    lubinance('BTC')
+    lubinance('EOS')
 
