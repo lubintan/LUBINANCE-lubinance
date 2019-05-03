@@ -49,7 +49,6 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
     while True:
 
         try:
-            assets+=1.03
             time.sleep(pollingInterval)
 
             start_time = time.time()
@@ -262,5 +261,5 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
 
 
 if __name__ == '__main__':
-    lubinance('ATOM')
+    lubinance('BTC')
 
