@@ -5,6 +5,7 @@ from analyzerFunctions import *
 
 
 def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
+
     client = Client(apiK, sK)
 
     startingUSD = float(1e3)
@@ -33,77 +34,171 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
 
 
     while True:
-        time.sleep(pollingInterval)
 
-        start_time = time.time()
-        pair = coin+'USDT'
-        dataPoints = getPricePanda(client, pair, client.KLINE_INTERVAL_1MINUTE, '7 minutes ago UTC')
+        try:
 
-        currentPrice = get_price(client,pair)
+            time.sleep(pollingInterval)
 
-        if currentPrice == prevPrice: continue
+            start_time = time.time()
+            pair = coin+'USDT'
+            dataPoints = getPricePanda(client, pair, client.KLINE_INTERVAL_1MINUTE, '7 minutes ago UTC')
 
-        currentDate = datetime.utcnow()
-        print('--------- date:',currentDate,'| price:', currentPrice, '| low thresh:', lowThreshold)
+            currentPrice = get_price(client,pair)
 
-        prevPrice = currentPrice
+            if currentPrice == prevPrice: continue
 
-        get_asset_balance(client,'USDT')
-        get_asset_balance(client,coin)
+            currentDate = datetime.utcnow()
+            print('--------- date:',currentDate,'| price:', currentPrice, '| low thresh:', lowThreshold)
 
-        latestBolliValue = bollingerLow(pd.to_numeric(dataPoints.iloc[-6:-1].close))
-        latestBar = dataPoints.iloc[-2]
-        latestLow = float(latestBar.low)
-        print('Latest Bar')
-        print(latestBar)
-        print('BolliValue:', latestBolliValue)
-        # print('Bars in Calculation:')
-        # print(dataPoints.iloc[-6:-1])
+            prevPrice = currentPrice
 
+            get_asset_balance(client,'USDT')
+            get_asset_balance(client,coin)
 
-        # bollinger band broken
-        if latestLow < (latestBolliValue * belowBolliPercent):
-            # bolliBreak = True
-            bolliDate = latestBar.date
-            lowThreshold = latestLow
-            print('Bollinger Floor Broken, Low Threshold', lowThreshold)
+            latestBolliValue = bollingerLow(pd.to_numeric(dataPoints.iloc[-6:-1].close))
+            latestBar = dataPoints.iloc[-2]
+            latestLow = float(latestBar.low)
+            print('Latest Bar')
+            print(latestBar)
+            print('BolliValue:', latestBolliValue)
+            # print('Bars in Calculation:')
+            # print(dataPoints.iloc[-6:-1])
 
 
-        bolliTimeSince = currentDate - bolliDate
-        print('Bolli Time Since:', bolliTimeSince)
+            # bollinger band broken
+            if latestLow < (latestBolliValue * belowBolliPercent):
+                # bolliBreak = True
+                bolliDate = latestBar.date
+                lowThreshold = latestLow
+                print('Bollinger Floor Broken, Low Threshold', lowThreshold)
 
-        if bolliTimeSince.seconds > bolliDelay:
-            bolliDate = datetime(2019, 1, 1)
-            buyTrigger = 1e5
-            lowThreshold = 0
-            print('bollinger RESET')
 
-        # buy condition
-        if (currentPrice > buyTrigger) and (currentPrice > lowThreshold):
-            print('Price above buy trigger but also above low threshold.')
-        if (bolliTimeSince.seconds < bolliDelay) and (currentPrice > buyTrigger) and (currentPrice <= lowThreshold) :
-            print('BUY ORDER TRIGGERED at trigger price:', buyTrigger)
-            if assets == 0:
-                print(str(currentDate), ': no USDT to buy',coin, 'with')
+            bolliTimeSince = currentDate - bolliDate
+            print('Bolli Time Since:', bolliTimeSince)
+
+            if bolliTimeSince.seconds > bolliDelay:
+                bolliDate = datetime(2019, 1, 1)
+                buyTrigger = 1e5
+                lowThreshold = 0
+                print('bollinger RESET')
+
+            # buy condition
+            if (currentPrice > buyTrigger) and (currentPrice > lowThreshold):
+                print('Price above buy trigger but also above low threshold.')
+            if (bolliTimeSince.seconds < bolliDelay) and (currentPrice > buyTrigger) and (currentPrice <= lowThreshold) :
+                print('BUY ORDER TRIGGERED at trigger price:', buyTrigger)
+                if assets == 0:
+                    print(str(currentDate), ': no USDT to buy',coin, 'with')
+                    continue
+
+                lastBuyPrice = currentPrice
+
+                buyPrice = currentPrice
+                btcAssets = assets / buyPrice
+                btcAssets = np.round(btcAssets * (1 - txFee), 7)
+                assets = 0
+                totalUSDTtxed += btcAssets * buyPrice
+
+                print('***')
+                print(str(currentDate), 'BUY AT:', buyPrice, 'current assets:', btcAssets, coin)
+                print('***')
+
+                #reset
+                bolliDate = datetime(2019, 1, 1)
+                buyTrigger = 1e5
+                lowThreshold = 0
+
+                print('Total Txed:', totalUSDTtxed)
+                print('USDT:', assets)
+                print(coin, btcAssets)
+
+                elapsed = time.time() - start_time
+                print('Time Taken:', elapsed, 's')
+
                 continue
 
-            lastBuyPrice = currentPrice
+            # enter Potential Buy Condition
 
-            buyPrice = currentPrice
-            btcAssets = assets / buyPrice
-            btcAssets = np.round(btcAssets * (1 - txFee), 7)
-            assets = 0
-            totalUSDTtxed += btcAssets * buyPrice
+            if (bolliTimeSince.seconds < bolliDelay) and (currentPrice < lowThreshold):
+                buyTrigger = (1+triggerPercent) * currentPrice
+                if buyTrigger > lowThreshold:
+                    buyTrigger = lowThreshold
+                print('buy trigger is at', buyTrigger)
 
-            print('***')
-            print(str(currentDate), 'BUY AT:', buyPrice, 'current assets:', btcAssets, coin)
-            print('***')
+            ########################################################################
 
-            #reset
-            bolliDate = datetime(2019, 1, 1)
-            buyTrigger = 1e5
-            lowThreshold = 0
+            # sell condition
+            if (currentPrice < sellTrigger) and (currentPrice >= highThreshold):
+                print('SELL ORDER TRIGGERED')
 
+                if btcAssets == 0:
+                    print(str(currentDate), ': no',coin,'to sell')
+                    continue
+
+                sellPrice = currentPrice
+                assets = btcAssets * sellPrice
+                assets = np.round(assets * (1 - txFee), 7)
+                btcAssets = 0
+                totalUSDTtxed += assets
+
+                print('***')
+                print(str(currentDate), 'SELL AT:', sellPrice, 'current assets:', assets, 'USDT')
+                print('***')
+
+                # reset
+                sellTrigger = 0
+                highThreshold = 1e5
+
+                print('Total Txed:', totalUSDTtxed)
+                print('USDT:', assets)
+                print(coin, btcAssets)
+
+                elapsed = time.time() - start_time
+                print('Time Taken:', elapsed, 's')
+                continue
+
+            elif (currentPrice < (failSafePercent*lastBuyPrice)) and (lastBuyPrice!=1e5):
+                print('Price FALLING TOO MUCH')
+                if btcAssets == 0:
+                    print(str(currentDate), ': no',coin,'to sell')
+                    continue
+
+                sellPrice = currentPrice
+                assets = btcAssets * sellPrice
+                assets = np.round(assets * (1 - txFee), 7)
+                btcAssets = 0
+                totalUSDTtxed += assets
+
+                print('***')
+                print(str(currentDate), 'SELL AT:', sellPrice, 'current assets:', assets, 'USDT')
+                print('***')
+
+                # reset
+                sellTrigger = 0
+                highThreshold = 1e5
+
+                print('Total Txed:', totalUSDTtxed)
+                print('USDT:', assets)
+                print(coin, btcAssets)
+
+                elapsed = time.time() - start_time
+                print('Time Taken:', elapsed, 's')
+                continue
+
+            # Enter potential Sell Condition
+            highThreshold = sellTriggerRatio * lastBuyPrice
+
+            print('Target Price to Sell At:', highThreshold)
+
+            if currentPrice > highThreshold:
+                sellTrigger = (1-sellTriggerPercent) * currentPrice
+                if sellTrigger < highThreshold:
+                    sellTrigger = highThreshold
+                print('sell trigger is at:', sellTrigger)
+
+
+
+            print('--- no tx ---')
             print('Total Txed:', totalUSDTtxed)
             print('USDT:', assets)
             print(coin, btcAssets)
@@ -111,98 +206,28 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
             elapsed = time.time() - start_time
             print('Time Taken:', elapsed, 's')
 
-            continue
+        except (ConnectionError, ConnectionAbortedError, ConnectionRefusedError, ConnectionResetError,
+                OSError, BinanceAPIException, BinanceOrderException, BinanceOrderMinAmountException,
+                BinanceOrderMinPriceException,
+                BinanceOrderMinTotalException, BinanceOrderUnknownSymbolException, BinanceRequestException) as e:
 
-        # enter Potential Buy Condition
-
-        if (bolliTimeSince.seconds < bolliDelay) and (currentPrice < lowThreshold):
-            buyTrigger = (1+triggerPercent) * currentPrice
-            if buyTrigger > lowThreshold:
-                buyTrigger = lowThreshold
-            print('buy trigger is at', buyTrigger)
-
-        ########################################################################
-
-        # sell condition
-        if (currentPrice < sellTrigger) and (currentPrice >= highThreshold):
-            print('SELL ORDER TRIGGERED')
-
-            if btcAssets == 0:
-                print(str(currentDate), ': no',coin,'to sell')
-                continue
-
-            sellPrice = currentPrice
-            assets = btcAssets * sellPrice
-            assets = np.round(assets * (1 - txFee), 7)
-            btcAssets = 0
-            totalUSDTtxed += assets
-
-            print('***')
-            print(str(currentDate), 'SELL AT:', sellPrice, 'current assets:', assets, 'USDT')
-            print('***')
-
-            # reset
-            sellTrigger = 0
-            highThreshold = 1e5
-
-            print('Total Txed:', totalUSDTtxed)
-            print('USDT:', assets)
-            print(coin, btcAssets)
-
-            elapsed = time.time() - start_time
-            print('Time Taken:', elapsed, 's')
-            continue
-
-        elif (currentPrice < (failSafePercent*lastBuyPrice)) and (lastBuyPrice!=1e5):
-            print('Price FALLING TOO MUCH')
-            if btcAssets == 0:
-                print(str(currentDate), ': no',coin,'to sell')
-                continue
-
-            sellPrice = currentPrice
-            assets = btcAssets * sellPrice
-            assets = np.round(assets * (1 - txFee), 7)
-            btcAssets = 0
-            totalUSDTtxed += assets
-
-            print('***')
-            print(str(currentDate), 'SELL AT:', sellPrice, 'current assets:', assets, 'USDT')
-            print('***')
-
-            # reset
-            sellTrigger = 0
-            highThreshold = 1e5
-
-            print('Total Txed:', totalUSDTtxed)
-            print('USDT:', assets)
-            print(coin, btcAssets)
-
-            elapsed = time.time() - start_time
-            print('Time Taken:', elapsed, 's')
-            continue
-
-        # Enter potential Sell Condition
-        highThreshold = sellTriggerRatio * lastBuyPrice
-
-        print('Target Price to Sell At:', highThreshold)
-
-        if currentPrice > highThreshold:
-            sellTrigger = (1-sellTriggerPercent) * currentPrice
-            if sellTrigger < highThreshold:
-                sellTrigger = highThreshold
-            print('sell trigger is at:', sellTrigger)
+            try:
+                errorHandler(e)
+                time.sleep(10)
+            except (KeyboardInterrupt):
+                print('Saving files..')
+                print('Files saved.')
+                exit('Shut down complete.')
 
 
+        except (KeyboardInterrupt):
+            try:
+                print('Shutting Down, please wait and do not press anything..')
 
-        print('--- no tx ---')
-        print('Total Txed:', totalUSDTtxed)
-        print('USDT:', assets)
-        print(coin, btcAssets)
-
-        elapsed = time.time() - start_time
-        print('Time Taken:', elapsed, 's')
-
-
+            finally:
+                print('Saving files..')
+                print('Files saved.')
+                exit('Shut down complete.')
 
 
 if __name__ == '__main__':
