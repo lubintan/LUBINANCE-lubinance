@@ -8,19 +8,17 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
 
     client = Client(apiK, sK)
 
-
-
     assets = getUSDTFromBasket(coin+'.txt')
 
     currentUSDT = get_asset_balance(client, 'USDT')
     currentCoin = get_asset_balance(client, coin)
 
-    if ((assets==0.0) and (currentCoin<2.0)) or (assets > currentUSDT):
-        print('Error with current',coin,'basket!')
-        print('basket value', assets, 'USDT')
-        print('Binance Balance USDT:', currentUSDT)
-        print('Binance Balance',coin+":",currentCoin)
-        exit()
+    # if ((assets==0.0) and (currentCoin<2.0)) or (assets > currentUSDT):
+    #     print('Error with current',coin,'basket!')
+    #     print('basket value', assets, 'USDT')
+    #     print('Binance Balance USDT:', currentUSDT)
+    #     print('Binance Balance',coin+":",currentCoin)
+    #     exit()
 
     btcAssets = 0
     txFee = 0.002  # 0.22%
@@ -42,8 +40,11 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
     totalUSDTtxed = 0
     prevPrice = 0
 
+    highThreshold = 1e5
+
     failSafePercent = 0.8 #lose at most 20%
 
+    fileName = coin+'txLog_'+datetime.utcnow().strftime("%y%m%d_%H:%M:%S")+'.txt'
 
     while True:
 
@@ -60,7 +61,11 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
             if currentPrice == prevPrice: continue
 
             currentDate = datetime.utcnow()
-            print('--------- date:',currentDate,'| price:', currentPrice, '| low thresh:', lowThreshold)
+            line = str(
+                currentDate) + ' BUY AT: ' + ' | current assets: ' + str(btcAssets) + ' ' + coin + ' | buy trigger: ' + str(buyTrigger) + ' | total USDT txed: ' + str(totalUSDTtxed)
+
+            print(line)
+            # writeToFile(fileName,line)
 
             prevPrice = currentPrice
 
@@ -70,9 +75,9 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
             latestBolliValue = bollingerLow(pd.to_numeric(dataPoints.iloc[-6:-1].close))
             latestBar = dataPoints.iloc[-2]
             latestLow = float(latestBar.low)
-            print('Latest Bar')
-            print(latestBar)
-            print('BolliValue:', latestBolliValue)
+            # print('Latest Bar')
+            # print(latestBar)
+            # print('BolliValue:', latestBolliValue)
             # print('Bars in Calculation:')
             # print(dataPoints.iloc[-6:-1])
 
@@ -82,7 +87,7 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                 # bolliBreak = True
                 bolliDate = latestBar.date
                 lowThreshold = latestLow
-                print('Bollinger Floor Broken, Low Threshold', lowThreshold)
+                # print('Bollinger Floor Broken, Low Threshold', lowThreshold)
 
 
             bolliTimeSince = currentDate - bolliDate
@@ -92,13 +97,13 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                 bolliDate = datetime(2019, 1, 1)
                 buyTrigger = 1e5
                 lowThreshold = 0
-                print('bollinger RESET')
+                # print('bollinger RESET')
 
             # buy condition
             if (currentPrice > buyTrigger) and (currentPrice > lowThreshold):
                 print('Price above buy trigger but also above low threshold.')
             if (bolliTimeSince.seconds < bolliDelay) and (currentPrice > buyTrigger) and (currentPrice <= lowThreshold) :
-                print('BUY ORDER TRIGGERED at trigger price:', buyTrigger)
+                # print('BUY ORDER TRIGGERED at trigger price:', buyTrigger)
                 if assets == 0:
                     print(str(currentDate), ': no USDT to buy',coin, 'with')
                     continue
@@ -111,9 +116,13 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                 assets = 0
                 totalUSDTtxed += btcAssets * buyPrice
 
+                line = str(currentDate) + ' BUY AT: ' + str(buyPrice) + ' | current assets: ' + str(btcAssets) +' '+coin+' | buy trigger: '+str(buyTrigger) + ' | total USDT txed: ' + str(totalUSDTtxed)
+
                 print('***')
-                print(str(currentDate), 'BUY AT:', buyPrice, 'current assets:', btcAssets, coin)
+                print(line)
                 print('***')
+
+                writeToFile(fileName,line)
 
                 #reset
                 bolliDate = datetime(2019, 1, 1)
@@ -135,13 +144,13 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                 buyTrigger = (1+triggerPercent) * currentPrice
                 if buyTrigger > lowThreshold:
                     buyTrigger = lowThreshold
-                print('buy trigger is at', buyTrigger)
+                # print('buy trigger is at', buyTrigger)
 
             ########################################################################
 
             # sell condition
             if (currentPrice < sellTrigger) and (currentPrice >= highThreshold):
-                print('SELL ORDER TRIGGERED')
+                # print('SELL ORDER TRIGGERED')
 
                 if btcAssets == 0:
                     print(str(currentDate), ': no',coin,'to sell')
@@ -153,9 +162,13 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                 btcAssets = 0
                 totalUSDTtxed += assets
 
+                line = str(currentDate)+ ' SELL AT: '+str(sellPrice)+' Current Assets: '+str(assets)+' USDT'+' | target sell price: '+str(highThreshold) + ' | total USDT txed: ' + str(totalUSDTtxed)
+
                 print('***')
-                print(str(currentDate), 'SELL AT:', sellPrice, 'current assets:', assets, 'USDT')
+                print(line)
                 print('***')
+
+                writeToFile(fileName,line)
 
                 # reset
                 sellTrigger = 0
@@ -181,9 +194,13 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                 btcAssets = 0
                 totalUSDTtxed += assets
 
+                line = str(currentDate) + ' SELL AT: ' + str(sellPrice) + ' Current Assets: ' + str(assets) + ' USDT' + ' | target sell price: ' + str(highThreshold) + ' | total USDT txed: ' + str(totalUSDTtxed)
+
                 print('***')
-                print(str(currentDate), 'SELL AT:', sellPrice, 'current assets:', assets, 'USDT')
+                print(line)
                 print('***')
+
+                writeToFile(fileName, line)
 
                 # reset
                 sellTrigger = 0
@@ -200,20 +217,20 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
             # Enter potential Sell Condition
             highThreshold = sellTriggerRatio * lastBuyPrice
 
-            print('Target Price to Sell At:', highThreshold)
+            # print('Target Price to Sell At:', highThreshold)
 
             if currentPrice > highThreshold:
                 sellTrigger = (1-sellTriggerPercent) * currentPrice
                 if sellTrigger < highThreshold:
                     sellTrigger = highThreshold
-                print('sell trigger is at:', sellTrigger)
+                # print('sell trigger is at:', sellTrigger)
 
 
 
-            print('--- no tx ---')
-            print('Total Txed:', totalUSDTtxed)
-            print('USDT:', assets)
-            print(coin, btcAssets)
+            # print('--- no tx ---')
+            # print('Total Txed:', totalUSDTtxed)
+            # print('USDT:', assets)
+            # print(coin, btcAssets)
 
             elapsed = time.time() - start_time
             print('Time Taken:', elapsed, 's')

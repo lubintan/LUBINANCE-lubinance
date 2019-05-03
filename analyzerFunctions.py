@@ -79,10 +79,18 @@ from sklearn.cluster import AgglomerativeClustering
 # TITLE = 'TrendLine Delay = ' + str(DELAY)
 TITLE = 'minor-grey, intermediate-blue, major-black'
 
+
+def writeToFile(filename,line='\n'):
+    filename = 'logs//'+filename
+    with open(filename, 'a+') as f:
+        f.writelines(line)
+        f.writelines('\n')
+
 def getUSDTFromBasket(filename):
     filename = 'baskets//' + filename
     f = open(filename, "r")
     amount = f.readline()
+    f.close()
     return float(amount)
 
 def putUSDTToBasket(filename, amount):
@@ -91,6 +99,7 @@ def putUSDTToBasket(filename, amount):
     precision = 5
     amount = "{:0.0{}f}".format(amount, precision)
     f.writelines(amount)
+    f.close()
 
 
 def bollingerLow(prevData, numOfStd=2):
@@ -100,74 +109,6 @@ def bollingerLow(prevData, numOfStd=2):
     return mean - (numOfStd * stdDev)
 
 
-def fixedIntervalBar(startDate=None,
-                     endDate=None,
-                     intervalDays=1,
-                     showStartDate=None,
-                     highColor='orange'):
-    dates = []
-
-    maxNumOfDaysIn5Years = 365 * 365
-    currentDate = startDate
-    y = []
-    counter = intervalDays
-    # dates.append(currentDate)
-    for i in range(maxNumOfDaysIn5Years):
-        if currentDate > endDate: break
-        if currentDate >= showStartDate:
-            dates.append(currentDate)
-            y.append(1)
-            # if counter==intervalDays:
-            #     y.append(1)
-            # else:
-            #     y.append(0)
-
-        currentDate += timedelta(days=intervalDays)
-        # currentDate += timedelta(days=1)
-        # if counter==intervalDays:
-        #     counter=0
-        # else:
-        #     counter+=1
-
-    # length=len(dates)
-
-    # project backwards if required
-
-    backDates = []
-    currentDate = startDate
-    backY = []
-    for i in range(maxNumOfDaysIn5Years):
-        currentDate -= timedelta(days=intervalDays)
-        if currentDate < showStartDate: break
-        backDates.append(currentDate)
-        backY.append(1)
-
-    dates = backDates + dates
-    y = backY + y
-
-    thisBar = Bar(x=dates, y=y,
-                  # width=[10]*length, #[barWidth] * length,
-                  # xbins=dict(start=np.min(HH_bars), size=size, end=np.max(HH_bars)),
-                  # hoverinfo='none',
-                  # name='HH Projection ' + eachProj.strftime("%y-%m-%d"),
-                  # dx=1,
-                  dy=1,
-                  # yaxis='y2',
-                  # legendgroup='Proj of next highs',
-                  showlegend=True,
-                  opacity=1,
-                  marker=dict(color=highColor),
-                  hoverinfo='x',
-                  # hoverlabel='',
-                  # marker=dict(color='navy'),
-                  )
-
-    # print(showStartDate,endDate,intervalDays)
-    # print(dates)
-    # print(thisBar)
-    # exit()
-
-    return thisBar
 def plotter(figure, filename, htmlList):
     plotly.offline.plot(figure_or_data=figure,
                         show_link=False,
@@ -193,321 +134,240 @@ def plotter(figure, filename, htmlList):
         for eachHtml in htmlList:
             htmlFile.write('\n' + eachHtml)
 
+def lubinanceForAnalysis(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
+    # from interactData import *
+    # must paste the above line at the top of file
+    client = Client(apiK, sK)
 
-def getActiveTrend(df):
-    # inside bars (fully ignore for trend line calculation)
-    # region: INSIDE BARS
-
-    activeDate = []
-    activeClose = []
-    activeOpen = []
-    activeHigh = []
-    activeLow = []
-    activeLowFirst = []
-    activeBarIndex = []
-
-    insideDate = []
-    insideClose = []
-    insideOpen = []
-    insideHigh = []
-    insideLow = []
-    insideBarIndex = []
-
-    for i, row in df.iterrows():
-
-        if i == 0:
-            activeDate.append(row.date)
-            activeClose.append(row.close)
-            activeOpen.append(row.open)
-            activeHigh.append(row.high)
-            activeLow.append(row.low)
-            activeLowFirst.append(row.lowFirst)
-            activeBarIndex.append(i)
-            continue
-
-
-        if (len(activeHigh)==0) and (len(activeLow)==0):
-            continue
-
-        if (activeHigh[-1] > row.high) & (activeLow[-1] < row.low):
-            insideDate.append(row.date)
-            insideClose.append(row.close)
-            insideOpen.append(row.open)
-            insideHigh.append(row.high)
-            insideLow.append(row.low)
-            insideBarIndex.append(i)
-            continue
-
-        activeDate.append(row.date)
-        activeClose.append(row.close)
-        activeOpen.append(row.open)
-        activeHigh.append(row.high)
-        activeLow.append(row.low)
-        activeLowFirst.append(row.lowFirst)
-        activeBarIndex.append(i)
-
-    noInsideBars = {
-        'date': activeDate,
-        'close': activeClose,
-        'open': activeOpen,
-        'high': activeHigh,
-        'low': activeLow,
-        'lowFirst': activeLowFirst,
-        'barIndex': activeBarIndex,
-    }
-    insideBarsOnly = {
-        'date': insideDate,
-        'close': insideClose,
-        'open': insideOpen,
-        'high': insideHigh,
-        'low': insideLow,
-        'barIndex': insideBarIndex,
-    }
-    dfIgnoreInsideBars = pd.DataFrame.from_dict(noInsideBars)
-    # dfInsideBarsOnly = pd.DataFrame.from_dict(insideBarsOnly)
-
-    trendLine1 = getTrendLine(dfIgnoreInsideBars)
-
-    return trendLine1
-
-def plotTrendlines(trendLine, name, color, width, dash=None):
-    line = Scatter(name=name + 'Trend', x=trendLine.date, y=trendLine.point,
-                   mode='lines+markers',
-                   line=dict(color=color,
-                             width=width,
-                             dash=dash
-                             ),
-                   hoverinfo='none',
-                   showlegend=True,
-                   )
-
-
-
-    return line
-
-
-def checkPrevPoints(dfIgnoreInsideBars, index, row, DELAY):
-    # takes out the chunk to be checked and reverses the order
-    testDf = (dfIgnoreInsideBars[(index - DELAY):index]).iloc[::-1]
-
-    # check for consecutive lower points
-    runningLow = row.low
-    trendLow = True
-    for idx, entry in testDf.iterrows():
-        if runningLow < entry.low:
-            trendLow = True
-            runningLow = entry.low
-        else:
-            trendLow = False
-            break
+    assets = getUSDTFromBasket(coin+'.txt')
 
-    # check for consecutive higher points
-    runningHigh = row.high
-    trendHigh = True
-    for idx, entry in testDf.iterrows():
-        if runningHigh > entry.high:
-            trendHigh = True
-            runningHigh = entry.high
-        else:
-            trendHigh = False
-            break
+    currentUSDT = get_asset_balance(client, 'USDT')
+    currentCoin = get_asset_balance(client, coin)
 
-    # add points if necessary
+    # if ((assets==0.0) and (currentCoin<2.0)) or (assets > currentUSDT):
+    #     print('Error with current',coin,'basket!')
+    #     print('basket value', assets, 'USDT')
+    #     print('Binance Balance USDT:', currentUSDT)
+    #     print('Binance Balance',coin+":",currentCoin)
+    #     exit()
 
-    if trendLow:
-        return [row.date, row.low, row.barIndex]
-    elif trendHigh:
-        return [row.date, row.high, row.barIndex]
+    btcAssets = 0
+    txFee = 0.002  # 0.22%
 
-        # otherwise do nothing
+    # bolliBreak = False
+    bolliDate = datetime(2019, 1, 1)
+    bolliDelay = 10 * 60  # 10 mins
+    lowThreshold = 0
+    belowBolliPercent = 0.9998
 
-        return None
+    triggerPercent = 0.00001
+    buyTrigger = 1e5
+    lastBuyPrice = 1e5
 
+    sellTriggerRatio = sellingMargin
+    sellTriggerPercent = 0.00001
+    sellTrigger = 0
 
-def processOutsideBars(row, trendPoints, DELAY, minorPoints):
+    totalUSDTtxed = 0
+    prevPrice = 0
 
-    # print('process outsidebars')
-    # print(minorPoints)
-    if len(minorPoints) >= 2:
-        if minorPoints[-1][1] >= minorPoints[-2][1]:  # trending up
-            if not row.lowFirst:  # high first
-                if DELAY == 1:  # high then low
-                    trendPoints.append([row.date, row.high, row.barIndex])
-                    trendPoints.append([row.date, row.low, row.barIndex])
-                else:  # 1 bar up
-                    trendPoints.append([row.date, row.high, row.barIndex])
-            else:  # low first
-                if DELAY == 1:  # low then high
-                    trendPoints.append([row.date, row.low, row.barIndex])
-                    trendPoints.append([row.date, row.high, row.barIndex])
-                else:  # 1 bar up
-                    trendPoints.append([row.date, row.high, row.barIndex])
+    failSafePercent = 0.8 #lose at most 20%
 
-        elif minorPoints[-1][1] < minorPoints[-2][1]:  # trending down
 
-            if not row.lowFirst:  # high first
-                if DELAY == 1:  # high then low
-                    trendPoints.append([row.date, row.high, row.barIndex])
-                    trendPoints.append([row.date, row.low, row.barIndex])
-                else:  # 1 bar up
-                    trendPoints.append([row.date, row.high, row.barIndex])
-            else:  # low first
-                if DELAY == 1:  # low then high
-                    trendPoints.append([row.date, row.low, row.barIndex])
-                    trendPoints.append([row.date, row.high, row.barIndex])
-                else:  # 1 bar down
-                    trendPoints.append([row.date, row.low, row.barIndex])
-    return trendPoints
+    while True:
 
+        try:
+            assets+=1.03
+            time.sleep(pollingInterval)
 
-def getTrendLine(dfIgnoreInsideBars):
-    dfIgnoreInsideBars['outside'] = (dfIgnoreInsideBars.high > dfIgnoreInsideBars.shift(1).high) & (
-            dfIgnoreInsideBars.low < dfIgnoreInsideBars.shift(1).low)
+            start_time = time.time()
+            pair = coin+'USDT'
+            dataPoints = getPricePanda(client, pair, client.KLINE_INTERVAL_1MINUTE, '7 minutes ago UTC')
 
-    minorPoints = []
+            currentPrice = get_price(client,pair)
 
+            if currentPrice == prevPrice: continue
 
-    # dfIgnoreInsideBars = pd.DataFrame(df)
+            currentDate = datetime.utcnow()
+            print('--------- date:',currentDate,'| price:', currentPrice, '| low thresh:', lowThreshold)
 
-    for index, row in dfIgnoreInsideBars.iterrows():
+            prevPrice = currentPrice
 
-        if index < 1: continue
-        if row.outside:
+            get_asset_balance(client,'USDT')
+            get_asset_balance(client,coin)
 
-            minorPoints = processOutsideBars(row, minorPoints, DELAY=1, minorPoints=minorPoints)
+            latestBolliValue = bollingerLow(pd.to_numeric(dataPoints.iloc[-6:-1].close))
+            latestBar = dataPoints.iloc[-2]
+            latestLow = float(latestBar.low)
+            print('Latest Bar')
+            print(latestBar)
+            print('BolliValue:', latestBolliValue)
+            # print('Bars in Calculation:')
+            # print(dataPoints.iloc[-6:-1])
 
-            continue
 
-        # minor points
-        result = checkPrevPoints(dfIgnoreInsideBars, index, row, DELAY=1)
-        if result != None: minorPoints.append(result)
+            # bollinger band broken
+            if latestLow < (latestBolliValue * belowBolliPercent):
+                # bolliBreak = True
+                bolliDate = latestBar.date
+                lowThreshold = latestLow
+                print('Bollinger Floor Broken, Low Threshold', lowThreshold)
 
 
+            bolliTimeSince = currentDate - bolliDate
+            print('Bolli Time Since:', bolliTimeSince)
 
-    trendLine1 = pd.DataFrame(minorPoints, columns=['date', 'point', 'barIndex'])
+            if bolliTimeSince.seconds > bolliDelay:
+                bolliDate = datetime(2019, 1, 1)
+                buyTrigger = 1e5
+                lowThreshold = 0
+                print('bollinger RESET')
 
-    return trendLine1
+            # buy condition
+            if (currentPrice > buyTrigger) and (currentPrice > lowThreshold):
+                print('Price above buy trigger but also above low threshold.')
+            if (bolliTimeSince.seconds < bolliDelay) and (currentPrice > buyTrigger) and (currentPrice <= lowThreshold) :
+                print('BUY ORDER TRIGGERED at trigger price:', buyTrigger)
+                if assets == 0:
+                    print(str(currentDate), ': no USDT to buy',coin, 'with')
+                    continue
 
+                lastBuyPrice = currentPrice
 
-def getTrendTopsAndBottoms(trendLine, df):
-    tops = ((trendLine.point > trendLine.shift(1).point) & (trendLine.point > trendLine.shift(-1).point))
-    bottoms = ((trendLine.point < trendLine.shift(1).point) & (trendLine.point < trendLine.shift(-1).point))
+                buyPrice = currentPrice
+                btcAssets = assets / buyPrice
+                btcAssets = np.round(btcAssets * (1 - txFee), 7)
+                assets = 0
+                totalUSDTtxed += btcAssets * buyPrice
 
-    trendLine['top'] = tops
-    trendLine['bottom'] = bottoms
+                print('***')
+                print(str(currentDate), 'BUY AT:', buyPrice, 'current assets:', btcAssets, coin)
+                print('***')
+
+                #reset
+                bolliDate = datetime(2019, 1, 1)
+                buyTrigger = 1e5
+                lowThreshold = 0
 
-    reindexed = trendLine.reset_index(drop=True)
+                print('Total Txed:', totalUSDTtxed)
+                print('USDT:', assets)
+                print(coin, btcAssets)
 
-    dateIndexOnly = pd.DataFrame()
-    dateIndexOnly['i'] = df.reset_index(drop=True).index
-    dateIndexOnly['date'] = df.date
-    reindexed = reindexed.merge(dateIndexOnly, on='date')
-
-    topPoints = pd.DataFrame(reindexed[tops])
-    # topPoints['i'] = topPoints.i
-    bottomPoints = pd.DataFrame(reindexed[bottoms])
-    # bottomPoints['i'] = bottomPoints.i
-    topAndBottomPoints = pd.DataFrame(reindexed[tops | bottoms])
-    # topAndBottomPoints['i'] = topAndBottomPoints.i
-
-    # region: High to High
-    HH_time = topPoints.date - topPoints.shift(1).date
-    HH_price = topPoints.point - topPoints.shift(1).point
-    HH_bars = topPoints.i - topPoints.shift(1).i
-
-    HH_time = HH_time.dropna()
-    HH_price = HH_price.dropna()
-
-    HH_bars = HH_bars.dropna()
-
-    # fig = ff.create_distplot([HH_bars], group_labels=['test1'],
-    # endregion
-
-    # region: Low to Low
-    LL_time = bottomPoints.date - bottomPoints.shift(1).date
-    LL_price = bottomPoints.point - bottomPoints.shift(1).point
-    LL_bars = bottomPoints.i - bottomPoints.shift(1).i
-
-    LL_time = LL_time.dropna()
-    LL_price = LL_price.dropna()
-    LL_bars = LL_bars.dropna()
-
-    LL_barsMean = np.mean(LL_bars)
-    # LL_barsMode = sp.stats.mode(LL_bars).mode[0]
-
-    LL_barsTrace = Histogram(x=LL_bars, xbins=dict(start=np.min(LL_bars), size=1, end=np.max(LL_bars)))
-    LL_barsFig = Figure(data=[LL_barsTrace])
-    # endregion
-
-    # region: High to Low and Low to High
-    mixed_time = topAndBottomPoints.date - topAndBottomPoints.shift(1).date
-    mixed_price = topAndBottomPoints.point - topAndBottomPoints.shift(1).point
-    mixed_bars = topAndBottomPoints.i - topAndBottomPoints.shift(1).i
-
-    mixed_time = mixed_time.dropna().reset_index(drop=True)
-    mixed_price = mixed_price.dropna().reset_index(drop=True)
-    mixed_bars = mixed_bars.dropna().reset_index(drop=True)
-
-    topAndBottomPoints.reset_index(drop=True, inplace=True)
-
-    if topAndBottomPoints.iloc[0].point < topAndBottomPoints.iloc[1].point:  # bottom first
-        HL_time = mixed_time[mixed_time.index % 2 == 0]  # even
-        LH_time = mixed_time[mixed_time.index % 2 == 1]  # odd
-
-        HL_price = mixed_price[mixed_price.index % 2 == 0]
-        LH_price = mixed_price[mixed_price.index % 2 == 1]
-
-        HL_bars = mixed_bars[mixed_bars.index % 2 == 0]
-        LH_bars = mixed_bars[mixed_bars.index % 2 == 1]
-
-    else:
-        HL_time = mixed_time[mixed_time.index % 2 == 1]
-        LH_time = mixed_time[mixed_time.index % 2 == 0]
-
-        HL_price = mixed_price[mixed_price.index % 2 == 1]
-        LH_price = mixed_price[mixed_price.index % 2 == 0]
-
-        HL_bars = mixed_bars[mixed_bars.index % 2 == 1]
-        LH_bars = mixed_bars[mixed_bars.index % 2 == 0]
-
-    # endregion
-
-    topText = []
-    bottomText = []
-    topAndBottomPoints['xDiff'] = topAndBottomPoints.i - topAndBottomPoints.shift(1).i
-    topAndBottomPoints['yDiff'] = topAndBottomPoints.point - topAndBottomPoints.shift(1).point
-
-    topAndBottomPoints.fillna(value=0,inplace=True)
-
-
-
-    for index, row in topAndBottomPoints.iterrows():
-        if row.top:
-            text = str(row.point) + '<br>'+ str(int(row.xDiff)) + '<br>' + '%.4f'%(row.yDiff)
-            topText.append(text)
-            # bottomText.append('')
-        elif row.bottom:
-            # topText.append('')
-            text = str(row.point) + '<br>' + str(int(row.xDiff)) + '<br>' + '%.4f' % (row.yDiff)
-            bottomText.append(text)
-        # else:
-        #     topText.append('')
-        #     bottomText.append('')
-
-    # print(trendLine)
-    # print(len(trendLine[tops]))
-    # print(len(topText.))
-    # print(topText)
-    # exit()
-
-
-    return dict(tops=trendLine[tops],
-                bottoms=trendLine[bottoms],
-                topsAndBottoms=trendLine[tops | bottoms],
-                topText=topText,
-                bottomText=bottomText,
-                HH_bars=HH_bars,
-                LL_bars=LL_bars,
-                HL_bars=HL_bars,
-                LH_bars=LH_bars,
-                )
+                elapsed = time.time() - start_time
+                print('Time Taken:', elapsed, 's')
+
+                continue
+
+            # enter Potential Buy Condition
+
+            if (bolliTimeSince.seconds < bolliDelay) and (currentPrice < lowThreshold):
+                buyTrigger = (1+triggerPercent) * currentPrice
+                if buyTrigger > lowThreshold:
+                    buyTrigger = lowThreshold
+                print('buy trigger is at', buyTrigger)
+
+            ########################################################################
+
+            # sell condition
+            if (currentPrice < sellTrigger) and (currentPrice >= highThreshold):
+                print('SELL ORDER TRIGGERED')
+
+                if btcAssets == 0:
+                    print(str(currentDate), ': no',coin,'to sell')
+                    continue
+
+                sellPrice = currentPrice
+                assets = btcAssets * sellPrice
+                assets = np.round(assets * (1 - txFee), 7)
+                btcAssets = 0
+                totalUSDTtxed += assets
+
+                print('***')
+                print(str(currentDate), 'SELL AT:', sellPrice, 'current assets:', assets, 'USDT')
+                print('***')
+
+                # reset
+                sellTrigger = 0
+                highThreshold = 1e5
+
+                print('Total Txed:', totalUSDTtxed)
+                print('USDT:', assets)
+                print(coin, btcAssets)
+
+                elapsed = time.time() - start_time
+                print('Time Taken:', elapsed, 's')
+                continue
+
+            elif (currentPrice < (failSafePercent*lastBuyPrice)) and (lastBuyPrice!=1e5):
+                print('Price FALLING TOO MUCH')
+                if btcAssets == 0:
+                    print(str(currentDate), ': no',coin,'to sell')
+                    continue
+
+                sellPrice = currentPrice
+                assets = btcAssets * sellPrice
+                assets = np.round(assets * (1 - txFee), 7)
+                btcAssets = 0
+                totalUSDTtxed += assets
+
+                print('***')
+                print(str(currentDate), 'SELL AT:', sellPrice, 'current assets:', assets, 'USDT')
+                print('***')
+
+                # reset
+                sellTrigger = 0
+                highThreshold = 1e5
+
+                print('Total Txed:', totalUSDTtxed)
+                print('USDT:', assets)
+                print(coin, btcAssets)
+
+                elapsed = time.time() - start_time
+                print('Time Taken:', elapsed, 's')
+                continue
+
+            # Enter potential Sell Condition
+            highThreshold = sellTriggerRatio * lastBuyPrice
+
+            print('Target Price to Sell At:', highThreshold)
+
+            if currentPrice > highThreshold:
+                sellTrigger = (1-sellTriggerPercent) * currentPrice
+                if sellTrigger < highThreshold:
+                    sellTrigger = highThreshold
+                print('sell trigger is at:', sellTrigger)
+
+
+
+            print('--- no tx ---')
+            print('Total Txed:', totalUSDTtxed)
+            print('USDT:', assets)
+            print(coin, btcAssets)
+
+            elapsed = time.time() - start_time
+            print('Time Taken:', elapsed, 's')
+
+        except (ConnectionError, ConnectionAbortedError, ConnectionRefusedError, ConnectionResetError,
+                OSError, BinanceAPIException, BinanceOrderException, BinanceOrderMinAmountException,
+                BinanceOrderMinPriceException,
+                BinanceOrderMinTotalException, BinanceOrderUnknownSymbolException, BinanceRequestException) as e:
+
+            try:
+                errorHandler(e)
+                time.sleep(10)
+            except (KeyboardInterrupt):
+                print('Saving files..')
+                putUSDTToBasket(coin+'.txt',assets)
+                print('Files saved.')
+                exit('Shut down complete.')
+
+
+        except (KeyboardInterrupt):
+            try:
+                print('Shutting Down, please wait and do not press anything..')
+
+            finally:
+                print('Saving files..')
+                putUSDTToBasket(coin + '.txt', assets)
+                print('Files saved.')
+                exit('Shut down complete.')
