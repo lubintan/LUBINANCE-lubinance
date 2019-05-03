@@ -79,6 +79,26 @@ from sklearn.cluster import AgglomerativeClustering
 # TITLE = 'TrendLine Delay = ' + str(DELAY)
 TITLE = 'minor-grey, intermediate-blue, major-black'
 
+def getUSDTFromBasket(filename):
+    filename = 'baskets//' + filename
+    f = open(filename, "r")
+    amount = f.readline()
+    return float(amount)
+
+def putUSDTToBasket(filename, amount):
+    filename = 'baskets//' + filename
+    f = open(filename, "w+")
+    precision = 5
+    amount = "{:0.0{}f}".format(amount, precision)
+    f.writelines(amount)
+
+
+def bollingerLow(prevData, numOfStd=2):
+    mean = np.mean(prevData)
+    stdDev = np.std(prevData)
+
+    return mean - (numOfStd * stdDev)
+
 
 def fixedIntervalBar(startDate=None,
                      endDate=None,
@@ -246,9 +266,9 @@ def getActiveTrend(df):
     dfIgnoreInsideBars = pd.DataFrame.from_dict(noInsideBars)
     # dfInsideBarsOnly = pd.DataFrame.from_dict(insideBarsOnly)
 
-    trendLine1, trendLine2, trendLine3 = getTrendLine(dfIgnoreInsideBars)
+    trendLine1 = getTrendLine(dfIgnoreInsideBars)
 
-    return trendLine1, trendLine2, trendLine3
+    return trendLine1
 
 def plotTrendlines(trendLine, name, color, width, dash=None):
     line = Scatter(name=name + 'Trend', x=trendLine.date, y=trendLine.point,
@@ -305,6 +325,9 @@ def checkPrevPoints(dfIgnoreInsideBars, index, row, DELAY):
 
 
 def processOutsideBars(row, trendPoints, DELAY, minorPoints):
+
+    # print('process outsidebars')
+    # print(minorPoints)
     if len(minorPoints) >= 2:
         if minorPoints[-1][1] >= minorPoints[-2][1]:  # trending up
             if not row.lowFirst:  # high first
@@ -342,40 +365,28 @@ def getTrendLine(dfIgnoreInsideBars):
             dfIgnoreInsideBars.low < dfIgnoreInsideBars.shift(1).low)
 
     minorPoints = []
-    intermediatePoints = []
-    majorPoints = []
+
 
     # dfIgnoreInsideBars = pd.DataFrame(df)
 
     for index, row in dfIgnoreInsideBars.iterrows():
+
         if index < 1: continue
         if row.outside:
 
-            if index >= 2: intermediatePoints = processOutsideBars(row, intermediatePoints, DELAY=2,
-                                                                   minorPoints=minorPoints)
-            if index >= 3: majorPoints = processOutsideBars(row, majorPoints, DELAY=3, minorPoints=minorPoints)
             minorPoints = processOutsideBars(row, minorPoints, DELAY=1, minorPoints=minorPoints)
+
             continue
 
         # minor points
         result = checkPrevPoints(dfIgnoreInsideBars, index, row, DELAY=1)
         if result != None: minorPoints.append(result)
 
-        # intermediate points
-        if index >= 2:
-            result = checkPrevPoints(dfIgnoreInsideBars, index, row, DELAY=2)
-            if result != None: intermediatePoints.append(result)
 
-        # major points
-        if index >= 3:
-            result = checkPrevPoints(dfIgnoreInsideBars, index, row, DELAY=3)
-            if result != None: majorPoints.append(result)
 
     trendLine1 = pd.DataFrame(minorPoints, columns=['date', 'point', 'barIndex'])
-    trendLine2 = pd.DataFrame(intermediatePoints, columns=['date', 'point', 'barIndex'])
-    trendLine3 = pd.DataFrame(majorPoints, columns=['date', 'point', 'barIndex'])
 
-    return trendLine1, trendLine2, trendLine3
+    return trendLine1
 
 
 def getTrendTopsAndBottoms(trendLine, df):

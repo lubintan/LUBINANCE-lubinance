@@ -8,8 +8,20 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
 
     client = Client(apiK, sK)
 
-    startingUSD = float(1e3)
-    assets = startingUSD
+
+
+    assets = getUSDTFromBasket(coin+'.txt')
+
+    currentUSDT = get_asset_balance(client, 'USDT')
+    currentCoin = get_asset_balance(client, coin)
+
+    if ((assets==0.0) and (currentCoin<2.0)) or (assets > currentUSDT):
+        print('Error with current',coin,'basket!')
+        print('basket value', assets, 'USDT')
+        print('Binance Balance USDT:', currentUSDT)
+        print('Binance Balance',coin+":",currentCoin)
+        exit()
+
     btcAssets = 0
     txFee = 0.002  # 0.22%
 
@@ -36,7 +48,7 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
     while True:
 
         try:
-
+            assets+=1.03
             time.sleep(pollingInterval)
 
             start_time = time.time()
@@ -216,6 +228,7 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                 time.sleep(10)
             except (KeyboardInterrupt):
                 print('Saving files..')
+                putUSDTToBasket(coin+'.txt',assets)
                 print('Files saved.')
                 exit('Shut down complete.')
 
@@ -226,6 +239,7 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
 
             finally:
                 print('Saving files..')
+                putUSDTToBasket(coin + '.txt', assets)
                 print('Files saved.')
                 exit('Shut down complete.')
 
