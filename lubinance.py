@@ -4,7 +4,7 @@ from analyzerFunctions import *
 
 
 
-def lubinance2():
+def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
     client = Client(apiK, sK)
 
     startingUSD = float(1e3)
@@ -12,7 +12,7 @@ def lubinance2():
     btcAssets = 0
     txFee = 0.002  # 0.22%
 
-    bolliBreak = False
+    # bolliBreak = False
     bolliDate = datetime(2019, 1, 1)
     bolliDelay = 10 * 60  # 10 mins
     lowThreshold = 0
@@ -22,7 +22,7 @@ def lubinance2():
     buyTrigger = 1e5
     lastBuyPrice = 1e5
 
-    sellTriggerRatio = 1.0052
+    sellTriggerRatio = sellingMargin
     sellTriggerPercent = 0.00001
     sellTrigger = 0
 
@@ -31,20 +31,15 @@ def lubinance2():
 
     failSafePercent = 0.8 #lose at most 20%
 
-    # priceHist = []
-    # window = 6
-    # lastSellDate = datetime(year=2018,month=1,day=1)
-    # lastBuyDate = datetime(year=2018,month=1,day=1)
-
 
     while True:
-        time.sleep(4)
+        time.sleep(pollingInterval)
 
         start_time = time.time()
+        pair = coin+'USDT'
+        dataPoints = getPricePanda(client, pair, client.KLINE_INTERVAL_1MINUTE, '7 minutes ago UTC')
 
-        dataPoints = getPricePanda(client, 'BTCUSDT', client.KLINE_INTERVAL_1MINUTE, '7 minutes ago UTC')
-
-        currentPrice = get_price(client,'BTCUSDT')
+        currentPrice = get_price(client,pair)
 
         if currentPrice == prevPrice: continue
 
@@ -54,7 +49,7 @@ def lubinance2():
         prevPrice = currentPrice
 
         get_asset_balance(client,'USDT')
-        get_asset_balance(client,'BTC')
+        get_asset_balance(client,coin)
 
         latestBolliValue = bollingerLow(pd.to_numeric(dataPoints.iloc[-6:-1].close))
         latestBar = dataPoints.iloc[-2]
@@ -87,9 +82,9 @@ def lubinance2():
         if (currentPrice > buyTrigger) and (currentPrice > lowThreshold):
             print('Price above buy trigger but also above low threshold.')
         if (bolliTimeSince.seconds < bolliDelay) and (currentPrice > buyTrigger) and (currentPrice <= lowThreshold) :
-            print('BUY ORDER TRIGGERED')
+            print('BUY ORDER TRIGGERED at trigger price:', buyTrigger)
             if assets == 0:
-                print(str(currentDate), ': no USDT to buy BTC with')
+                print(str(currentDate), ': no USDT to buy',coin, 'with')
                 continue
 
             lastBuyPrice = currentPrice
@@ -101,7 +96,7 @@ def lubinance2():
             totalUSDTtxed += btcAssets * buyPrice
 
             print('***')
-            print(str(currentDate), 'BUY AT:', buyPrice, 'assets:', btcAssets, 'BTC')
+            print(str(currentDate), 'BUY AT:', buyPrice, 'current assets:', btcAssets, coin)
             print('***')
 
             #reset
@@ -111,7 +106,7 @@ def lubinance2():
 
             print('Total Txed:', totalUSDTtxed)
             print('USDT:', assets)
-            print('BTC:', btcAssets)
+            print(coin, btcAssets)
 
             elapsed = time.time() - start_time
             print('Time Taken:', elapsed, 's')
@@ -133,7 +128,7 @@ def lubinance2():
             print('SELL ORDER TRIGGERED')
 
             if btcAssets == 0:
-                print(str(currentDate), ': no BTC to sell')
+                print(str(currentDate), ': no',coin,'to sell')
                 continue
 
             sellPrice = currentPrice
@@ -143,7 +138,7 @@ def lubinance2():
             totalUSDTtxed += assets
 
             print('***')
-            print(str(currentDate), 'SELL AT:', sellPrice, 'assets:', assets, 'USD')
+            print(str(currentDate), 'SELL AT:', sellPrice, 'current assets:', assets, 'USDT')
             print('***')
 
             # reset
@@ -152,7 +147,7 @@ def lubinance2():
 
             print('Total Txed:', totalUSDTtxed)
             print('USDT:', assets)
-            print('BTC:', btcAssets)
+            print(coin, btcAssets)
 
             elapsed = time.time() - start_time
             print('Time Taken:', elapsed, 's')
@@ -161,7 +156,7 @@ def lubinance2():
         elif (currentPrice < (failSafePercent*lastBuyPrice)) and (lastBuyPrice!=1e5):
             print('Price FALLING TOO MUCH')
             if btcAssets == 0:
-                print(str(currentDate), ': no BTC to sell')
+                print(str(currentDate), ': no',coin,'to sell')
                 continue
 
             sellPrice = currentPrice
@@ -171,7 +166,7 @@ def lubinance2():
             totalUSDTtxed += assets
 
             print('***')
-            print(str(currentDate), 'SELL AT:', sellPrice, 'assets:', assets, 'USDT')
+            print(str(currentDate), 'SELL AT:', sellPrice, 'current assets:', assets, 'USDT')
             print('***')
 
             # reset
@@ -180,7 +175,7 @@ def lubinance2():
 
             print('Total Txed:', totalUSDTtxed)
             print('USDT:', assets)
-            print('BTC:', btcAssets)
+            print(coin, btcAssets)
 
             elapsed = time.time() - start_time
             print('Time Taken:', elapsed, 's')
@@ -202,7 +197,7 @@ def lubinance2():
         print('--- no tx ---')
         print('Total Txed:', totalUSDTtxed)
         print('USDT:', assets)
-        print('BTC:', btcAssets)
+        print(coin, btcAssets)
 
         elapsed = time.time() - start_time
         print('Time Taken:', elapsed, 's')
@@ -211,5 +206,5 @@ def lubinance2():
 
 
 if __name__ == '__main__':
-    lubinance2()
+    lubinance('ATOM')
 
