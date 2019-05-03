@@ -45,6 +45,7 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
     failSafePercent = 0.8 #lose at most 20%
 
     fileName = coin+'txLog_'+datetime.utcnow().strftime("%y%m%d_%H:%M:%S")+'.txt'
+    pair = coin + 'USDT'
 
     while True:
 
@@ -107,16 +108,36 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                     print(str(currentDate), ': no USDT to buy',coin, 'with')
                     continue
 
-                lastBuyPrice = currentPrice
+                # BUY section
 
+                buyTime = time.time()
                 buyPrice = currentPrice
                 btcAssets = assets / buyPrice
-                btcAssets = np.round(btcAssets * (1 - txFee), 7)
+                price, quantity = formattedPrcQty(coin, buyPrice, btcAssets)
+                buyId = limit_buy(client,coin,quantity=quantity,price=price)
+
+                while True:
+                    time.sleep(2)
+                    openOrders = get_open_orders(client,pair)
+                    if len(openOrders) == 0:
+                        break
+
+                    now = time.time()
+                    if (now-buyTime) > 10: # if waited more than
+                        cancelled = cancel_order(client,pair,buyId)
+                        writeToFile(fileName,'CANCELLED BUY:'+str(currentDate)+' | price: '+currentPrice)
+                        print('CANCELLED BUY','Price:',currentPrice)
+                        print(cancelled)
+                        continue
+
+
+
+
+                lastBuyPrice = buyPrice
+                btcAssets = get_asset_balance(client,coin)
                 assets = 0
                 totalUSDTtxed += btcAssets * buyPrice
-
                 line = str(currentDate) + ' BUY AT: ' + str(buyPrice) + ' | current assets: ' + str(btcAssets) +' '+coin+' | buy trigger: '+str(buyTrigger) + ' | total USDT txed: ' + str(totalUSDTtxed)
-
                 highThreshold = sellTriggerRatio * lastBuyPrice
 
                 print('***')
@@ -157,9 +178,33 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                     print(str(currentDate), ': no',coin,'to sell')
                     continue
 
+
+                # SELL section
+
+                sellTime = time.time()
                 sellPrice = currentPrice
+                btcAssets = get_asset_balance(client,coin)
+                price, quantity = formattedPrcQty(coin, sellPrice, btcAssets)
+                sellId = limit_sell(client,coin,quantity=quantity,price=price)
+
+                while True:
+                    time.sleep(2)
+                    openOrders = get_open_orders(client,pair)
+                    if len(openOrders) == 0:
+                        break
+
+                    now = time.time()
+                    if (now-sellTime) > 30: # if waited more than
+                        cancelled = cancel_order(client,pair,sellId)
+                        writeToFile(fileName,'CANCELLED SELL:'+str(currentDate)+' | price: '+currentPrice)
+                        print('CANCELLED SELL','Price:',currentPrice)
+                        print(cancelled)
+                        continue
+
+
+
                 assets = btcAssets * sellPrice
-                assets = np.round(assets * (1 - txFee), 7)
+                assets = np.round(assets * (1 - txFee), 4)
                 btcAssets = 0
                 totalUSDTtxed += assets
 
@@ -189,9 +234,31 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                     print(str(currentDate), ': no',coin,'to sell')
                     continue
 
+                # SELL section
+
+                sellTime = time.time()
                 sellPrice = currentPrice
+                btcAssets = get_asset_balance(client, coin)
+                price, quantity = formattedPrcQty(coin, sellPrice, btcAssets)
+                sellId = limit_sell(client, coin, quantity=quantity, price=price)
+
+                while True:
+                    time.sleep(2)
+                    openOrders = get_open_orders(client, pair)
+                    if len(openOrders) == 0:
+                        break
+
+                    now = time.time()
+                    if (now - sellTime) > 30:  # if waited more than
+                        cancelled = cancel_order(client, pair, sellId)
+                        writeToFile(fileName, 'CANCELLED SELL:' + str(currentDate) + ' | price: ' + currentPrice)
+                        print('CANCELLED SELL', 'Price:', currentPrice)
+                        print(cancelled)
+                        continue
+
+
                 assets = btcAssets * sellPrice
-                assets = np.round(assets * (1 - txFee), 7)
+                assets = np.round(assets * (1 - txFee), 4)
                 btcAssets = 0
                 totalUSDTtxed += assets
 
@@ -216,12 +283,13 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                 continue
 
             # Enter potential Sell Condition
-            highThreshold = sellTriggerRatio * lastBuyPrice
+            # highThreshold = sellTriggerRatio * lastBuyPrice
 
             # print('Target Price to Sell At:', highThreshold)
 
             if currentPrice > highThreshold:
                 sellTrigger = (1-sellTriggerPercent) * currentPrice
+
                 if sellTrigger < highThreshold:
                     sellTrigger = highThreshold
                 # print('sell trigger is at:', sellTrigger)
