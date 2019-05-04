@@ -114,7 +114,7 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                 buyPrice = currentPrice
                 btcAssets = assets / buyPrice
                 price, quantity = formattedPrcQty(coin, buyPrice, btcAssets)
-                buyId = limit_buy(client,coin,quantity=quantity,price=price)
+                buyId = limit_buy(client,pair,quantity=quantity,price=price)
 
                 while True:
                     time.sleep(2)
@@ -186,7 +186,7 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                 sellPrice = currentPrice
                 btcAssets = get_asset_balance(client,coin)
                 price, quantity = formattedPrcQty(coin, sellPrice, btcAssets)
-                sellId = limit_sell(client,coin,quantity=quantity,price=price)
+                sellId = limit_sell(client,pair,quantity=quantity,price=price)
 
                 while True:
                     time.sleep(2)
@@ -241,7 +241,7 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                 sellPrice = currentPrice
                 btcAssets = get_asset_balance(client, coin)
                 price, quantity = formattedPrcQty(coin, sellPrice, btcAssets)
-                sellId = limit_sell(client, coin, quantity=quantity, price=price)
+                sellId = limit_sell(client, pair, quantity=quantity, price=price)
 
                 while True:
                     time.sleep(2)
