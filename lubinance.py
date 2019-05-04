@@ -126,7 +126,7 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                     if (now-buyTime) > 10: # if waited more than
                         cancelled = cancel_order(client,pair,buyId)
                         btcAssets = 0
-                        writeToFile(fileName,'CANCELLED BUY:'+str(currentDate)+' | price: '+currentPrice)
+                        writeToFile(fileName,'CANCELLED BUY:'+str(currentDate)+' | price: '+str(currentPrice))
                         print('CANCELLED BUY','Price:',currentPrice)
                         print(cancelled)
                         continue
@@ -197,7 +197,7 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                     now = time.time()
                     if (now-sellTime) > 30: # if waited more than
                         cancelled = cancel_order(client,pair,sellId)
-                        writeToFile(fileName,'CANCELLED SELL:'+str(currentDate)+' | price: '+currentPrice)
+                        writeToFile(fileName,'CANCELLED SELL:'+str(currentDate)+' | price: '+str(currentPrice))
                         print('CANCELLED SELL','Price:',currentPrice)
                         print(cancelled)
                         continue
@@ -252,7 +252,7 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
                     now = time.time()
                     if (now - sellTime) > 30:  # if waited more than
                         cancelled = cancel_order(client, pair, sellId)
-                        writeToFile(fileName, 'CANCELLED SELL:' + str(currentDate) + ' | price: ' + currentPrice)
+                        writeToFile(fileName, 'CANCELLED SELL:' + str(currentDate) + ' | price: ' + str(currentPrice))
                         print('CANCELLED SELL', 'Price:', currentPrice)
                         print(cancelled)
                         continue
@@ -332,5 +332,5 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
 
 
 if __name__ == '__main__':
-    lubinance('EOS')
+    lubinance('ATOM')
 
