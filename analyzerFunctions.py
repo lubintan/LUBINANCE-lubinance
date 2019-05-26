@@ -80,6 +80,20 @@ from sklearn.cluster import AgglomerativeClustering
 TITLE = 'minor-grey, intermediate-blue, major-black'
 
 
+def uptrendFinder(uptrendData):
+    midpoints = []
+    for i, r in uptrendData.iterrows():
+        mid = ((r.high - r.low) / 2) + r.low
+        midpoints.append(mid)
+
+    print('Finding Uptrend..',midpoints)
+
+    for i in range(len(midpoints) - 1):
+        if midpoints[i] >= midpoints[i + 1]:
+            return False
+
+    return True
+
 def writeToFile(filename,line='\n'):
     filename = 'logs//'+filename
     with open(filename, 'a+') as f:
