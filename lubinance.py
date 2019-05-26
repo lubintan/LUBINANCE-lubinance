@@ -4,30 +4,20 @@ from analyzerFunctions import *
 
 
 
-def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
+def lubinance(coin='BTC', buyMargin = 0.9975,sellingMargin=1.007,pollingInterval = 20):
 
     client = Client(apiK, sK)
 
     assets = getUSDTFromBasket(coin+'.txt')
-
-    currentUSDT = get_asset_balance(client, 'USDT')
-    currentCoin = get_asset_balance(client, coin)
-
-    # if ((assets==0.0) and (currentCoin<2.0)) or (assets > currentUSDT):
-    #     print('Error with current',coin,'basket!')
-    #     print('basket value', assets, 'USDT')
-    #     print('Binance Balance USDT:', currentUSDT)
-    #     print('Binance Balance',coin+":",currentCoin)
-    #     exit()
 
     btcAssets = 0
     txFee = 0.002  # 0.22%
 
     # bolliBreak = False
     bolliDate = datetime(2019, 1, 1)
-    bolliDelay = 10 * 60  # 10 mins
+    bolliDelay = 35 * 60  # 35 mins
     lowThreshold = 0
-    belowBolliPercent = 0.9998
+    belowBolliPercent = 0.9995
 
     triggerPercent = 0.00001
     buyTrigger = 1e5
@@ -47,263 +37,323 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
     fileName = coin+'txLog_'+datetime.utcnow().strftime("%y%m%d_%H:%M:%S")+'.txt'
     pair = coin + 'USDT'
 
-    while True:
+    openBuyId = None
+    openSellId = None
 
+    longPosition = False
+
+    #check for outstanding orders
+    print()
+    openOrders = get_open_orders(client, pair)
+
+    cancelOrders = None
+
+    while len(openOrders) > 0:
+        print(len(openOrders), "currently exist!")
+        for each in openOrders:
+            print(each)
+
+
+        if cancelOrders == None:
+            a = input("Enter 'y' to automatically cancel ALL orders. Anything else will wait for orders to complete")
+            if a =='y':
+                for each in openOrders:
+                    orderId = each['orderId']
+                    cancelOrders = cancel_order(client,pair,orderId)
+                    time.sleep(0.3)
+                    print('Cancelled Order', each)
+            else:
+                cancelOrders = False
+
+        time.sleep(pollingInterval)
+        openOrders = get_open_orders(client, pair)
+
+
+    #check how much you have
+    btcAssets = get_asset_balance(client,coin)
+    if btcAssets < 0.001:
+        longPosition = False
+        print('Currently not holding', coin,'. Starting with USDT.')
+    else:
+        longPosition = True
+        print('Currently holding',btcAssets,coin)
+
+
+    while True:
         try:
             time.sleep(pollingInterval)
 
+            if longPosition == True:
+
+                # wait for sell order to fill
+                sellStatus = get_order_status(client, pair, openSellId)
+
+                if sellStatus!='FILLED':
+                    continue
+
+                else:
+                    start_time = time.time()
+                    sellPrice, assets = get_order_price_cumQty(client, pair, openSellId)
+                    btcAssets = get_asset_balance(client, coin)
+                    openSellId = None
+                    longPosition = False
+                    elapsed = time.time() - start_time
+
+                    line = str(currentDate) + ' SELL AT: ' + str(sellPrice) + ' Current Assets: ' + str(assets) + ' USDT'
+                    print('***')
+                    print(line)
+                    print('***')
+
+                    print('Time Taken:', elapsed, 's')
+                    continue
+
+            # long position == False
+
             start_time = time.time()
-            pair = coin+'USDT'
             dataPoints = getPricePanda(client, pair, client.KLINE_INTERVAL_1MINUTE, '7 minutes ago UTC')
 
-            currentPrice = get_price(client,pair)
-
-            if currentPrice == prevPrice: continue
-
+            currentPrice = get_price(client, pair)
             currentDate = datetime.utcnow()
             line = str(
-                currentDate) + ' ' + coin+  ' price: '+ str(currentPrice) + ' | buy trigger: ' + str(buyTrigger) + ' | Target Sell: ' + str(highThreshold)
+                currentDate) + ' ' + coin + ' price: ' + str(currentPrice) + ' | buy trigger: ' + str(
+                lowThreshold * buyMargin) + ' | Target Sell: ' + str(highThreshold)
 
             print(line)
-            # writeToFile(fileName,line)
 
-            prevPrice = currentPrice
-
-            get_asset_balance(client,'USDT')
-            get_asset_balance(client,coin)
+            print('| openBuyId:', openBuyId, '| openSellId:',openSellId,'| long position:',longPosition)
 
             latestBolliValue = bollingerLow(pd.to_numeric(dataPoints.iloc[-6:-1].close))
             latestBar = dataPoints.iloc[-2]
             latestLow = float(latestBar.low)
-            # print('Latest Bar')
-            # print(latestBar)
-            # print('BolliValue:', latestBolliValue)
-            # print('Bars in Calculation:')
-            # print(dataPoints.iloc[-6:-1])
-
 
             # bollinger band broken
-            if latestLow < (latestBolliValue * belowBolliPercent):
-                # bolliBreak = True
-                bolliDate = latestBar.date
-                lowThreshold = latestLow
-                # print('Bollinger Floor Broken, Low Threshold', lowThreshold)
+            if (latestLow < (latestBolliValue * belowBolliPercent) and (latestLow != lowThreshold)):
+                if assets < 1:
+                    print(str(currentDate), ': no USDT to buy', coin, 'with')
+                    continue
 
 
+
+                if openBuyId != None:
+                    status = get_order_status(client, pair, openBuyId)
+                    if status != 'FILLED':
+                        cancelled = cancel_order(client, pair, openBuyId)
+                        time.sleep(0.3)
+                        cancelStatus = get_order_status(client, pair, openBuyId)
+
+                        if cancelStatus == 'CANCELED':
+                            print('CANCELLED BUY', 'ID', cancelled)
+                            openBuyId = None
+                            longPosition = False
+                        elif cancelStatus == 'FILLED':
+                            # go on to buy settings
+
+                            lastBuyPrice = buyPrice
+                            btcAssets = get_asset_balance(client, coin)
+                            assets = 0
+
+                            highThreshold = sellTriggerRatio * lastBuyPrice
+
+                            line = str(currentDate) + ' BUY AT: ' + str(buyPrice) + ' | current assets: ' + str(
+                                btcAssets) + ' ' + coin + 'sell trigger now at: ' + str(highThreshold)
+
+                            print('***')
+                            print(line)
+                            print('***')
+
+                            # reset
+                            bolliDate = datetime(2019, 1, 1)
+                            buyTrigger = 1e5
+                            lowThreshold = 0
+                            openBuyId = None
+                            longPosition = True
+
+                            # now put in sell limit order
+
+                            price, quantity = formattedPrcQty(coin, highThreshold, btcAssets)
+                            openSellId = limit_sell(client, pair, quantity=quantity, price=price)
+
+                            elapsed = time.time() - start_time
+                            print('Time Taken:', elapsed, 's')
+
+                            continue
+
+
+                        else:
+                            # skip and go on to next iteration
+                            continue
+
+                    elif status == 'FILLED':
+                        # go on to buy settings
+
+                        lastBuyPrice = buyPrice
+                        btcAssets = get_asset_balance(client, coin)
+                        assets = 0
+
+                        highThreshold = sellTriggerRatio * lastBuyPrice
+
+                        line = str(currentDate) + ' BUY AT: ' + str(buyPrice) + ' | current assets: ' + str(
+                            btcAssets) + ' ' + coin + 'sell trigger now at: ' + str(highThreshold)
+
+                        print('***')
+                        print(line)
+                        print('***')
+
+                        # reset
+                        bolliDate = datetime(2019, 1, 1)
+                        buyTrigger = 1e5
+                        lowThreshold = 0
+                        openBuyId = None
+                        longPosition = True
+
+                        # now put in sell limit order
+
+                        price, quantity = formattedPrcQty(coin, highThreshold, btcAssets)
+                        openSellId = limit_sell(client, pair, quantity=quantity, price=price)
+
+                        elapsed = time.time() - start_time
+                        print('Time Taken:', elapsed, 's')
+
+                        continue
+
+                # after previous open buy is cancelled
+                if openBuyId == None:
+                    # put in buy limit order
+
+                    order = get_open_orders(client,pair)
+
+                    if len(order) == 0:
+
+                        bolliDate = latestBar.date
+                        lowThreshold = latestLow
+
+                        buyPrice = lowThreshold * buyMargin
+                        btcAssets = assets / buyPrice
+                        price, quantity = formattedPrcQty(coin, buyPrice, btcAssets)
+                        openBuyId = limit_buy(client, pair, quantity=quantity, price=price)
+
+                        print('Put in Buy Order',openBuyId,'at',price)
+                        time.sleep(62-pollingInterval)
+                        continue
+
+                    else:
+                        print('openBuyId', openBuyId, ', but still got open orders')
+                        for each in order:
+                            print(each)
+
+            # if waited too long
             bolliTimeSince = currentDate - bolliDate
             print('Bolli Time Since:', bolliTimeSince)
 
             if bolliTimeSince.seconds > bolliDelay:
-                bolliDate = datetime(2019, 1, 1)
-                buyTrigger = 1e5
-                lowThreshold = 0
-                # print('bollinger RESET')
 
-            # buy condition
-            if (currentPrice > buyTrigger) and (currentPrice > lowThreshold):
-                print('Price above buy trigger but also above low threshold.')
-            if (bolliTimeSince.seconds < bolliDelay) and (currentPrice > buyTrigger) and (currentPrice <= lowThreshold) :
-                # print('BUY ORDER TRIGGERED at trigger price:', buyTrigger)
-                if assets == 0:
-                    print(str(currentDate), ': no USDT to buy',coin, 'with')
-                    continue
+                if openBuyId != None:
+                    print('--- WAITED TOO LONG ---')
 
-                # BUY section
+                    status = get_order_status(client, pair, openBuyId)
+                    if status != 'FILLED':
+                        cancelled = cancel_order(client, pair, openBuyId)
+                        time.sleep(0.3)
+                        cancelStatus = get_order_status(client, pair, openBuyId)
 
-                buyTime = time.time()
-                buyPrice = currentPrice
-                btcAssets = assets / buyPrice
-                price, quantity = formattedPrcQty(coin, buyPrice, btcAssets)
-                buyId = limit_buy(client,pair,quantity=quantity,price=price)
+                        if cancelStatus == 'CANCELED':
+                            print('CANCELLED BUY', 'ID:', cancelled)
+                            openBuyId = None
+                            longPosition = False
+                        elif cancelStatus == 'FILLED':
+                            # go on to buy settings
 
-                while True:
-                    time.sleep(2)
-                    openOrders = get_open_orders(client,pair)
-                    if len(openOrders) == 0:
-                        break
+                            lastBuyPrice = buyPrice
+                            btcAssets = get_asset_balance(client, coin)
+                            assets = 0
 
-                    now = time.time()
-                    if (now-buyTime) > 10: # if waited more than
-                        cancelled = cancel_order(client,pair,buyId)
-                        btcAssets = 0
-                        writeToFile(fileName,'CANCELLED BUY:'+str(currentDate)+' | price: '+str(currentPrice))
-                        print('CANCELLED BUY','Price:',currentPrice)
-                        print(cancelled)
-                        continue
+                            highThreshold = sellTriggerRatio * lastBuyPrice
 
+                            line = str(currentDate) + ' BUY AT: ' + str(buyPrice) + ' | current assets: ' + str(
+                                btcAssets) + ' ' + coin + 'sell trigger now at: ' + str(highThreshold)
 
+                            print('***')
+                            print(line)
+                            print('***')
 
+                            # reset
+                            bolliDate = datetime(2019, 1, 1)
+                            buyTrigger = 1e5
+                            lowThreshold = 0
+                            openBuyId = None
+                            longPosition = True
 
-                lastBuyPrice = buyPrice
-                btcAssets = get_asset_balance(client,coin)
-                assets = 0
-                totalUSDTtxed += btcAssets * buyPrice
-                line = str(currentDate) + ' BUY AT: ' + str(buyPrice) + ' | current assets: ' + str(btcAssets) +' '+coin+' | buy trigger: '+str(buyTrigger) + ' | total USDT txed: ' + str(totalUSDTtxed)
-                highThreshold = sellTriggerRatio * lastBuyPrice
+                            # now put in sell limit order
 
-                print('***')
-                print(line)
-                print('***')
+                            price, quantity = formattedPrcQty(coin, highThreshold, btcAssets)
+                            openSellId = limit_sell(client, pair, quantity=quantity, price=price)
 
-                writeToFile(fileName,line)
+                            elapsed = time.time() - start_time
+                            print('Time Taken:', elapsed, 's')
 
-                #reset
-                bolliDate = datetime(2019, 1, 1)
-                buyTrigger = 1e5
-                lowThreshold = 0
+                            continue
 
-                print('Total Txed:', totalUSDTtxed)
-                print('USDT:', assets)
-                print(coin, btcAssets)
-
-                elapsed = time.time() - start_time
-                print('Time Taken:', elapsed, 's')
-
-                continue
-
-            # enter Potential Buy Condition
-
-            if (bolliTimeSince.seconds < bolliDelay) and (currentPrice < lowThreshold):
-                buyTrigger = (1+triggerPercent) * currentPrice
-                if buyTrigger > lowThreshold:
-                    buyTrigger = lowThreshold
-                # print('buy trigger is at', buyTrigger)
-
-            ########################################################################
-
-            # sell condition
-            if (currentPrice < sellTrigger) and (currentPrice >= highThreshold):
-                # print('SELL ORDER TRIGGERED')
-
-                if btcAssets == 0:
-                    print(str(currentDate), ': no',coin,'to sell')
-                    continue
-
-
-                # SELL section
-
-                sellTime = time.time()
-                sellPrice = currentPrice
-                btcAssets = get_asset_balance(client,coin)
-                price, quantity = formattedPrcQty(coin, sellPrice, btcAssets)
-                sellId = limit_sell(client,pair,quantity=quantity,price=price)
-
-                while True:
-                    time.sleep(2)
-                    openOrders = get_open_orders(client,pair)
-                    if len(openOrders) == 0:
-                        break
-
-                    now = time.time()
-                    if (now-sellTime) > 30: # if waited more than
-                        cancelled = cancel_order(client,pair,sellId)
-                        writeToFile(fileName,'CANCELLED SELL:'+str(currentDate)+' | price: '+str(currentPrice))
-                        print('CANCELLED SELL','Price:',currentPrice)
-                        print(cancelled)
-                        continue
+                        else:
+                            # skip and go on to next iteration
+                            continue
 
 
 
-                assets = btcAssets * sellPrice
-                assets = np.round(assets * (1 - txFee), 4)
-                btcAssets = 0
-                totalUSDTtxed += assets
+###########################################################################################################
 
-                line = str(currentDate)+ ' SELL AT: '+str(sellPrice)+' Current Assets: '+str(assets)+' USDT'+' | target sell price: '+str(highThreshold) + ' | total USDT txed: ' + str(totalUSDTtxed)
-
-                print('***')
-                print(line)
-                print('***')
-
-                writeToFile(fileName,line)
-
-                # reset
-                sellTrigger = 0
-                highThreshold = 1e5
-
-                print('Total Txed:', totalUSDTtxed)
-                print('USDT:', assets)
-                print(coin, btcAssets)
-
-                elapsed = time.time() - start_time
-                print('Time Taken:', elapsed, 's')
-                continue
-
-            elif (currentPrice < (failSafePercent*lastBuyPrice)) and (lastBuyPrice!=1e5):
-                print('Price FALLING TOO MUCH')
-                if btcAssets == 0:
-                    print(str(currentDate), ': no',coin,'to sell')
-                    continue
-
-                # SELL section
-
-                sellTime = time.time()
-                sellPrice = currentPrice
-                btcAssets = get_asset_balance(client, coin)
-                price, quantity = formattedPrcQty(coin, sellPrice, btcAssets)
-                sellId = limit_sell(client, pair, quantity=quantity, price=price)
-
-                while True:
-                    time.sleep(2)
-                    openOrders = get_open_orders(client, pair)
-                    if len(openOrders) == 0:
-                        break
-
-                    now = time.time()
-                    if (now - sellTime) > 30:  # if waited more than
-                        cancelled = cancel_order(client, pair, sellId)
-                        writeToFile(fileName, 'CANCELLED SELL:' + str(currentDate) + ' | price: ' + str(currentPrice))
-                        print('CANCELLED SELL', 'Price:', currentPrice)
-                        print(cancelled)
-                        continue
-
-
-                assets = btcAssets * sellPrice
-                assets = np.round(assets * (1 - txFee), 4)
-                btcAssets = 0
-                totalUSDTtxed += assets
-
-                line = str(currentDate) + ' SELL AT: ' + str(sellPrice) + ' Current Assets: ' + str(assets) + ' USDT' + ' | target sell price: ' + str(highThreshold) + ' | total USDT txed: ' + str(totalUSDTtxed)
-
-                print('***')
-                print(line)
-                print('***')
-
-                writeToFile(fileName, line)
-
-                # reset
-                sellTrigger = 0
-                highThreshold = 1e5
-
-                print('Total Txed:', totalUSDTtxed)
-                print('USDT:', assets)
-                print(coin, btcAssets)
-
-                elapsed = time.time() - start_time
-                print('Time Taken:', elapsed, 's')
-                continue
-
-            # Enter potential Sell Condition
-            # highThreshold = sellTriggerRatio * lastBuyPrice
-
-            # print('Target Price to Sell At:', highThreshold)
-
-            if currentPrice > highThreshold:
-                sellTrigger = (1-sellTriggerPercent) * currentPrice
-
-                if sellTrigger < highThreshold:
-                    sellTrigger = highThreshold
-                # print('sell trigger is at:', sellTrigger)
-
-
-
-            # print('--- no tx ---')
-            # print('Total Txed:', totalUSDTtxed)
-            # print('USDT:', assets)
-            # print(coin, btcAssets)
-
-            elapsed = time.time() - start_time
-            print('Time Taken:', elapsed, 's')
+            # elif (currentPrice < (failSafePercent*lastBuyPrice)) and (lastBuyPrice!=1e5):
+            #     print('Price FALLING TOO MUCH')
+            #     if btcAssets == 0:
+            #         print(str(currentDate), ': no',coin,'to sell')
+            #         continue
+            #
+            #     # SELL section
+            #
+            #     sellTime = time.time()
+            #     sellPrice = currentPrice
+            #     btcAssets = get_asset_balance(client, coin)
+            #     price, quantity = formattedPrcQty(coin, sellPrice, btcAssets)
+            #     sellId = limit_sell(client, pair, quantity=quantity, price=price)
+            #
+            #     while True:
+            #         time.sleep(2)
+            #         openOrders = get_open_orders(client, pair)
+            #         if len(openOrders) == 0:
+            #             break
+            #
+            #         now = time.time()
+            #         if (now - sellTime) > 30:  # if waited more than
+            #             cancelled = cancel_order(client, pair, sellId)
+            #             writeToFile(fileName, 'CANCELLED SELL:' + str(currentDate) + ' | price: ' + str(currentPrice))
+            #             print('CANCELLED SELL', 'Price:', currentPrice)
+            #             print(cancelled)
+            #             continue
+            #
+            #
+            #     assets = btcAssets * sellPrice
+            #     assets = np.round(assets * (1 - txFee), 4)
+            #     btcAssets = 0
+            #     totalUSDTtxed += assets
+            #
+            #     line = str(currentDate) + ' SELL AT: ' + str(sellPrice) + ' Current Assets: ' + str(assets) + ' USDT' + ' | target sell price: ' + str(highThreshold) + ' | total USDT txed: ' + str(totalUSDTtxed)
+            #
+            #     print('***')
+            #     print(line)
+            #     print('***')
+            #
+            #     writeToFile(fileName, line)
+            #
+            #     # reset
+            #     sellTrigger = 0
+            #     highThreshold = 1e5
+            #
+            #     print('Total Txed:', totalUSDTtxed)
+            #     print('USDT:', assets)
+            #     print(coin, btcAssets)
+            #
+            #     elapsed = time.time() - start_time
+            #     print('Time Taken:', elapsed, 's')
+            #     continue
 
         except (ConnectionError, ConnectionAbortedError, ConnectionRefusedError, ConnectionResetError,
                 OSError, BinanceAPIException, BinanceOrderException, BinanceOrderMinAmountException,
@@ -332,5 +382,5 @@ def lubinance(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
 
 
 if __name__ == '__main__':
-    lubinance('ATOM')
+    lubinance('ETH')
 
