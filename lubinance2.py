@@ -4,7 +4,7 @@ from analyzerFunctions import *
 
 
 
-def lubinance(coin='BTC', buyMargin = 0.9975,sellingMargin=1.008,pollingInterval = 20):
+def lubinance(coin='BTC', startUSDT = '',buyMargin = 0.9975,sellingMargin=1.008,pollingInterval = 20):
 
     client = Client(apiK, sK)
     pair = coin + 'USDT'
@@ -48,7 +48,10 @@ def lubinance(coin='BTC', buyMargin = 0.9975,sellingMargin=1.008,pollingInterval
         print('Currently holding',btcAssets,coin)
     #endregion
 
-    assets = getUSDTFromBasket(coin+'.txt')
+    if startUSDT=='':
+        assets = getUSDTFromBasket(coin+'.txt')
+    else:
+        assets = float(startUSDT)
 
     btcAssets = 0
     txFeePercent = 0.001
@@ -72,6 +75,7 @@ def lubinance(coin='BTC', buyMargin = 0.9975,sellingMargin=1.008,pollingInterval
 
     waitForBuyBreak = False
     buyBreakPercent = 1.003
+    buyBarrierFactor = 0.8
     gap = 0.9975
     sellStopPercent = 0.9991
     sellLimitPercent = 0.9986
@@ -205,10 +209,15 @@ def lubinance(coin='BTC', buyMargin = 0.9975,sellingMargin=1.008,pollingInterval
             print('waitForBuyBreak:', waitForBuyBreak)
 
             if waitForBuyBreak:
-                buyBreakThresh = maHigh * buyBreakPercent
-                print('buyBreakThresh', buyBreakThresh)
 
-                if currentPrice > buyBreakThresh:
+                hourPoint = getPricePanda(client, pair, client.KLINE_INTERVAL_1HOUR, '60 minutes ago UTC')
+                hourPoint = hourPoint.iloc[0]
+                buyBarrier = (hourPoint.high - hourPoint.low) * buyBarrierFactor + hourPoint.low
+
+                buyBreakThresh = maHigh * buyBreakPercent
+                print('buyBreakThresh', buyBreakThresh, 'buyBarrier', buyBarrier)
+
+                if (currentPrice > buyBreakThresh) and (currentPrice < buyBarrier):
                     # put in buy limit order for currentPrice * buyBreakLimit
                     buyPrice = maHigh* (buyBreakPercent + 0.0007)
                     buyQty = assets/buyPrice
@@ -336,6 +345,7 @@ def lubinance(coin='BTC', buyMargin = 0.9975,sellingMargin=1.008,pollingInterval
                 print('Shutting Down, please wait and do not press anything..')
 
             finally:
+                print('*** Current USDT Allocation:', assets, '***')
                 print('Saving files..')
                 putUSDTToBasket(coin + '.txt', assets)
                 print('Files saved.')
@@ -343,5 +353,8 @@ def lubinance(coin='BTC', buyMargin = 0.9975,sellingMargin=1.008,pollingInterval
 
 
 if __name__ == '__main__':
-    lubinance('BTC')
+    symbol =  input('Enter Coin Ticker:').upper()
+    startUSDT = input('Enter beginning USDT')
+
+    lubinance(symbol, startUSDT)
 
