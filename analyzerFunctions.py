@@ -4,9 +4,9 @@ from datetime import timedelta
 
 import pandas as pd
 import numpy as np
-import plotly
-from plotly.graph_objs import Layout, Scatter, Line, Ohlc, Figure, Histogram, Bar, Table
-import plotly.figure_factory as ff
+# import plotly
+# from plotly.graph_objs import Layout, Scatter, Line, Ohlc, Figure, Histogram, Bar, Table
+# import plotly.figure_factory as ff
 import scipy as sp
 import time
 from sklearn.cluster import AgglomerativeClustering
@@ -123,30 +123,30 @@ def bollingerLow(prevData, numOfStd=2):
     return mean - (numOfStd * stdDev)
 
 
-def plotter(figure, filename, htmlList):
-    plotly.offline.plot(figure_or_data=figure,
-                        show_link=False,
-                        output_type='file',
-                        include_plotlyjs=False,
-                        filename=filename,
-                        auto_open=True,
-                        config={'displaylogo': False,
-                                'modeBarButtonsToRemove': [
-                                    # 'zoom2d',
-                                    #                        'sendDataToCloud',
-                                    # 'select2d',
-                                    # 'zoomIn2d',
-                                    # 'zoomOut2d',
-                                    #                        'resetScale2d', 'hoverCompareCartesian', 'lasso2d'
-                                ]})
-    line = '<script src="plotly-latest.min.js"></script>'
-    with open(filename, 'r+') as htmlFile:
-        contents = htmlFile.read()
-        htmlFile.seek(0, 0)
-        htmlFile.write(line.rstrip('\r\n') + '\n' + contents)
-
-        for eachHtml in htmlList:
-            htmlFile.write('\n' + eachHtml)
+# def plotter(figure, filename, htmlList):
+#     plotly.offline.plot(figure_or_data=figure,
+#                         show_link=False,
+#                         output_type='file',
+#                         include_plotlyjs=False,
+#                         filename=filename,
+#                         auto_open=True,
+#                         config={'displaylogo': False,
+#                                 'modeBarButtonsToRemove': [
+#                                     # 'zoom2d',
+#                                     #                        'sendDataToCloud',
+#                                     # 'select2d',
+#                                     # 'zoomIn2d',
+#                                     # 'zoomOut2d',
+#                                     #                        'resetScale2d', 'hoverCompareCartesian', 'lasso2d'
+#                                 ]})
+#     line = '<script src="plotly-latest.min.js"></script>'
+#     with open(filename, 'r+') as htmlFile:
+#         contents = htmlFile.read()
+#         htmlFile.seek(0, 0)
+#         htmlFile.write(line.rstrip('\r\n') + '\n' + contents)
+#
+#         for eachHtml in htmlList:
+#             htmlFile.write('\n' + eachHtml)
 
 def lubinanceForAnalysis(coin='BTC', sellingMargin=1.006, pollingInterval = 4):
     # from interactData import *

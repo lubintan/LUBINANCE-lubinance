@@ -141,7 +141,7 @@ def lubinance(coin='BTC', startUSDT = '',buyMargin = 0.9975,sellingMargin=1.008,
 
 
 
-                    uptrendData = dataPoints.iloc[-6:-1]
+                    uptrendData = dataPoints.iloc[-4:-1]
                     uptrendFound = uptrendFinder(uptrendData)
 
                     print('uptrend foud? ==>', uptrendFound)
@@ -155,12 +155,25 @@ def lubinance(coin='BTC', startUSDT = '',buyMargin = 0.9975,sellingMargin=1.008,
                             stopPrice, sellQty = formattedPrcQty(coin,sellStop,btcAssets)
                             limitPrice, sellQty = formattedPrcQty(coin,sellLimit, btcAssets)
 
-                            openSellId = stop_limit_sell(client,pair,quantity=sellQty,stopprice=stopPrice,limitprice=limitPrice)
-                            sellMin = sellStop
+                            try:
+                                openSellId = stop_limit_sell(client,pair,quantity=sellQty,stopprice=stopPrice,limitprice=limitPrice)
+                                sellMin = sellStop
 
-                            print('!! S-E-L-L !!', 'order num', openSellId, 'stop', stopPrice, 'limit', limitPrice,
-                                  'qty', sellQty)
-                            continue
+                                print('!! S-E-L-L !!', 'order num', openSellId, 'stop', stopPrice, 'limit', limitPrice,
+                                      'qty', sellQty)
+                                continue
+                            except(BinanceAPIException, BinanceOrderException, BinanceOrderMinAmountException,
+                                   BinanceOrderMinPriceException,
+                                   BinanceOrderMinTotalException, BinanceOrderUnknownSymbolException,
+                                   BinanceRequestException) as e:
+                                print(e)
+                                print("Binance API Error")
+                                if str(e).strip() == 'APIError(code=-2010): Order would trigger immediately.':
+                                    openSellId = limit_sell(client,pair,sellQty,limitPrice)
+                                    print('LIMIT SELL', openSellId)
+                                    continue
+                                else:
+                                    exit(3000)
                     else:
                         continue
                 else:
@@ -174,15 +187,27 @@ def lubinance(coin='BTC', startUSDT = '',buyMargin = 0.9975,sellingMargin=1.008,
                         btcAssets = get_asset_balance(client, coin)
                         stopPrice, sellQty = formattedPrcQty(coin, sellStop, btcAssets)
                         limitPrice, sellQty = formattedPrcQty(coin, sellLimit, btcAssets)
+                        try:
+                            openSellId = stop_limit_sell(client, pair, quantity=sellQty, stopprice=stopPrice,
+                                                         limitprice=limitPrice)
+                            sellMin = sellStop
 
-                        openSellId = stop_limit_sell(client, pair, quantity=sellQty, stopprice=stopPrice,
-                                                     limitprice=limitPrice)
-                        sellMin = sellStop
+                            print('!! S-E-L-L !!', 'order num',openSellId,'stop',stopPrice,'limit',limitPrice, 'qty', sellQty, 'buyId', openBuyId, 'sellId',openSellId)
+                            continue
+                        except(BinanceAPIException, BinanceOrderException, BinanceOrderMinAmountException,
+                               BinanceOrderMinPriceException,
+                               BinanceOrderMinTotalException, BinanceOrderUnknownSymbolException,
+                               BinanceRequestException) as e:
+                            print(e)
+                            print("Binance API Error")
+                            if str(e).strip() == 'APIError(code=-2010): Order would trigger immediately.':
+                                openSellId = limit_sell(client, pair, sellQty, limitPrice)
+                                print('LIMIT SELL', openSellId)
+                                continue
+                            else:
+                                exit(3000)
 
-                        print('!! S-E-L-L !!', 'order num',openSellId,'stop',stopPrice,'limit',limitPrice, 'qty', sellQty, 'buyId', openBuyId, 'sellId',openSellId)
-                        continue
-
-                    elif status=='FILLED':
+                    elif status==client.ORDER_STATUS_FILLED:
                         uptrendFound = False
                         longPosition = False
 
@@ -210,7 +235,7 @@ def lubinance(coin='BTC', startUSDT = '',buyMargin = 0.9975,sellingMargin=1.008,
 
             if waitForBuyBreak:
 
-                hourPoint = getPricePanda(client, pair, client.KLINE_INTERVAL_1HOUR, '60 minutes ago UTC')
+                hourPoint = getPricePanda(client, pair, client.KLINE_INTERVAL_1HOUR, '120 minutes ago UTC')
                 hourPoint = hourPoint.iloc[0]
                 buyBarrier = (hourPoint.high - hourPoint.low) * buyBarrierFactor + hourPoint.low
 
@@ -334,9 +359,9 @@ def lubinance(coin='BTC', startUSDT = '',buyMargin = 0.9975,sellingMargin=1.008,
                 BinanceOrderMinTotalException, BinanceOrderUnknownSymbolException, BinanceRequestException) as e:
             print(e)
             print("Binance API Error")
-            if str(e).strip()=='APIError(code=-2010): Order would trigger immediately.':
-                print('continuing..')
-                continue
+            # if str(e).strip()=='APIError(code=-2010): Order would trigger immediately.':
+            #     print('continuing..')
+            #     continue
 
             exit(3000)
 
