@@ -4,95 +4,135 @@ from datetime import timedelta
 
 import pandas as pd
 import numpy as np
-# import plotly
-# from plotly.graph_objs import Layout, Scatter, Line, Ohlc, Figure, Histogram, Bar, Table
-# import plotly.figure_factory as ff
-import scipy as sp
-import time
-from sklearn.cluster import AgglomerativeClustering
+import time, sys
+import logging
 
-# TODO:
-# plotly
-# table and chart subplot
-# figure factory subplot
-# gantt chart for intersecting projections (basic)
-# mixed subplot
-# tables, histograms
-
-# TODO:
-# Window 1999-2001
-# Check for toppest top and bottomest bottom
-# Take date - Get year, month, week, day for that top/bottom point.
-# If top & bottom:
-# Look at next year. If top taken out, choose bottomest bottom date. And vice versa.
-# If cannot resolve, go to following year and see if top or bottom taken out.
-#
-# TODO:
-# Price Retracements
-# All on the right hand side.
-# See email for retracement levels.
-# For now, for each full trend (up or down).
-# "mini" projections only for current, where don't know whether trend has ended or not.
-# Differnet levels for up trend or down trend.
-#
-#
-# TODO: UPDATE BY EACH DAY/BAR!
-# DONE: Current trend (always up or down.)
-# DONE: See if broke previous top or bottom.
-# DONE: If sideways, (trend up/down will just keep flipping.)
-# DONE: If doesn't break, keep the previous trend.
-#
-# TODO:
-# Fig 12.2, 12.3 - show difference in price, time at max/min points.
-# (Non-trend indicator. Raw data)
-
-#
-# TODO:
-# Tops and Bottoms Projection
-# Find latest trend (up or down), can be current trend also.
-# collate H-H, H-L, L-L, L-H data. (for both uptrend and downtrend)
-# Project for each H-H, H-L, L-L, L-H using previous set of numbers from whole data set.
-# For each H-H, H-L, L-L, L-H, show historgram of dates vs 1x of each duration from previous trend. Do for both tops and bottoms.
-# if current trend has no eg. H-L data yet, use previous trend's data.
-# replace previous set of data, once there is 1 value from current trend.
-# IMPT: For H-L and L-L, only project ONCE for each set of numbers.
-# Combine H-L and L-L charts (to see which dates have hits).
-# Combine L-H and H-H charts (to see which dates have hits).
-# 2 things to look for: 1. highest frequecnies of intervals from the past. 2. projections - where the dates line up.
-# to project Lows, use L-L, and H-L (different starting points)
-# to project Highs, use H-H, and L-H (different starting points)
-# See if can use gantt chart to show which projections come from where.
-
-# TODO: Lost Motion
-# TODO: Signal Tops/Bottoms
-
-# TODO:
-# - DONE: split 3 trendlines
-# - DONE: outside bar include closer to open/close thing for highs and lows
-# - DONE: HH, HL, LH, LL - histogram?
-
-# TODO:
-#     - write program to be efficient: only make changes to new data collected (don’t recompute everything.)
-
-# - DONE: see swing high and low numbers. High green circle, low red circle.
-
-# TITLE = 'TrendLine Delay = ' + str(DELAY)
 TITLE = 'minor-grey, intermediate-blue, major-black'
 
+def printer(inputDict, file):
+    
+    pd = {}
+    pd['Date'] = ''
+    pd['Current Price'] = ''
+    pd['assets'] = ''
+    pd['btcAssets'] = ''
+    pd['Bolli Broken'] = ''
+    pd['Wait Buy Break'] = ''
+    pd['Buy Order Cancelled'] = ''
+    pd['Buy Order'] = ''
+    pd['Stop'] = ''
+    pd['Limit'] = ''
+    pd['Buy Executed'] = ''
+    pd['Buy Price'] = ''
+    pd['Target'] = ''
+    pd['Margin'] = ''
+    pd['Drop Threshold'] = ''
+    pd['Sell Order Cancelled'] = ''
+    pd['Sell Order'] = ''
+    pd['Sell Stop'] = ''
+    pd['Sell Limit'] = ''
+    pd['Sell Executed'] = ''
+    pd['Sell Price'] = ''
+    pd['Mini Sell Order Cancelled'] = ''
+    pd['Mini Sell Order'] = ''
+    pd['Mini Sell Stop'] = ''
+    pd['Mini Sell Limit'] = ''
+    pd['Mini Sell Executed'] = ''
+    pd['Mini Sell Price'] = ''
+    pd['Open Phase Entered'] = ''
+    pd['Open Phase Exited'] = ''
+    pd['Close Phase Entered'] = ''
+    pd['Close Phase Exited'] = ''
+    
+    headerList = ['Date',
+                 'Current Price',
+                 'assets',
+                 'btcAssets',
+                 'Bolli Broken',
+                 'Wait Buy Break',
+                 'Buy Order Cancelled',
+                 'Buy Order',
+                 'Stop',
+                 'Limit',
+                 'Buy Executed',
+                 'Buy Price',
+                 'Target',
+                 'Margin',
+                 'Drop Threshold',
+                 'Sell Order Cancelled',
+                 'Sell Order',
+                 'Sell Stop',
+                 'Sell Limit',
+                 'Sell Executed',
+                 'Sell Price',
+                 'Mini Sell Order Cancelled',
+                 'Mini Sell Order',
+                 'Mini Sell Stop',
+                 'Mini Sell Limit',
+                 'Mini Sell Executed',
+                 'Mini Sell Price',
+                 'Open Phase Entered',
+                 'Open Phase Exited',
+                 'Close Phase Entered',
+                 'Close Phase Exited']
 
-def uptrendFinder(uptrendData):
+    for eachKey in inputDict.keys():
+        pd[eachKey] = str(inputDict[eachKey])
+
+    printingList = ''
+
+    for eachKey in headerList:
+        printingList = printingList + pd[eachKey] + ','
+
+    print(printingList, file=file)
+
+
+def uptrendFinder(uptrendData,file):
     midpoints = []
     for i, r in uptrendData.iterrows():
         mid = ((r.high - r.low) / 2) + r.low
         midpoints.append(mid)
 
-    print('Finding Uptrend..',midpoints)
+    # print('Finding Uptrend..',midpoints,file=file)
 
     for i in range(len(midpoints) - 1):
         if midpoints[i] >= midpoints[i + 1]:
             return False
 
     return True
+
+def downtrendFinder(downtrendData,file):
+    midpoints = []
+    for i, r in downtrendData.iterrows():
+        mid = ((r.high - r.low) / 2) + r.low
+        midpoints.append(mid)
+
+    # print('Finding Uptrend..',midpoints,file=file)
+
+    for i in range(len(midpoints) - 1):
+        if midpoints[i] <= midpoints[i + 1]:
+            return False
+
+    return True
+
+def gainLossCounter(uptrendData):
+    gainCounter = 0
+    lossCounter = 0
+    length = len(uptrendData)
+    for i, r in uptrendData.iterrows():
+        if r.open < r.close: gainCounter += 1
+        elif r.close < r.open: lossCounter += 1
+
+    total = float(gainCounter + lossCounter)
+    if total == 0:
+        gains = 1
+        losses = gains
+    else:
+        losses = int(length * lossCounter/total)
+        gains = length-losses
+
+    return gains, losses
+
 
 def writeToFile(filename,line='\n'):
     filename = 'logs//'+filename

@@ -19,7 +19,7 @@ belowBolliPercent = 0.9995
 
 gap = 0.9975
 sellStopPercent = 0.9991
-sellLimitPercent = 0.9986
+sellLimitPercent =0.9986
 postSellRest = 3600  # 1 hour
 
 txFee = 0.001
@@ -227,6 +227,8 @@ def closedPhase(client, coin, sellPrice=None, margin=None, ):
                 buyPrice = currentPrice
 
                 margin = margin + (buyPrice * feePercent)
+                if margin > (0.015 * buyPrice):
+                    margin = 0.015*buyPrice
 
                 buyDate = buyDate + [current.date]
                 buyPriceList = buyPriceList + [buyPrice]
@@ -1047,6 +1049,7 @@ if __name__ == '__main__':
 
     intervals = [Client.KLINE_INTERVAL_1MINUTE, Client.KLINE_INTERVAL_5MINUTE, Client.KLINE_INTERVAL_15MINUTE,
                  Client.KLINE_INTERVAL_30MINUTE]
+    intervals = [Client.KLINE_INTERVAL_15MINUTE]
     global data
 
     for coin in markets:

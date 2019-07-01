@@ -1,12 +1,13 @@
 from interactData import *
 from analyzerFunctions import *
 import random
-from plotly.graph_objs import Scatter,Ohlc,Figure,Layout,Candlestick
-import plotly
+
+TRADE_INTERVAL = Client.KLINE_INTERVAL_15MINUTE
+TRADE_WINDOW = '105 minutes ago UTC'
 
 profitPercent = 0.01
 subprofitPercent = 0.006
-pollingInterval = 20
+pollingInterval = 90
 dropPercent = 0.985
 feePercent = 0.001
 
@@ -24,93 +25,14 @@ postSellRest = 3600  # 1 hour
 
 txFee = 0.001
 
-counter = 7
-# data = None
 btcAssets = 0
-assets = 100
+assets = 0
 triggerPercent = 0.003
 
-buyDate = []
-buyPriceList = []
-sellDate = []
-sellPriceList = []
-miniSellDate = []
-miniSellPrice = []
+rebalancingDeviationThresh = 0.2
+piePercent = 0.04
 
-sellOrderDate = []
-sellOrderStop = []
-sellOrderLimit = []
-
-buyOrderDate = []
-buyOrderStop = []
-buyOrderLimit = []
-
-miniSellOrderDate = []
-miniSellOrderStop = []
-miniSellOrderLimit = []
-
-cancelDate = []
-cancelPrice = []
-
-bolliThreshList = []
-bolliThreshDate = []
-buyBreakerDate = []
-buyBreaker = []
-buyBarrierDate = []
-buyBarrierList = []
-
-prevThreshDate = []
-prevThreshList = []
-
-targetDate =[]
-targetList = []
-miniTargetDate = []
-miniTargetList = []
-
-def resetter():
-
-    global buyDate, buyPriceList, sellDate, sellPriceList, miniSellDate,miniSellPrice
-    global sellOrderDate,sellOrderStop,sellOrderLimit, buyOrderDate, buyOrderLimit
-    global miniSellOrderDate, miniSellOrderLimit, miniSellOrderStop
-    global bolliThreshList, bolliThreshDate, buyBreaker, buyBreakerDate, prevThreshList, prevThreshDate
-    global targetDate,targetList, miniTargetDate, miniTargetList
-    buyDate = []
-    buyPriceList = []
-    sellDate = []
-    sellPriceList = []
-    miniSellDate = []
-    miniSellPrice = []
-
-    sellOrderDate = []
-    sellOrderStop = []
-    sellOrderLimit = []
-
-    buyOrderDate = []
-    buyOrderStop = []
-    buyOrderLimit = []
-
-    miniSellOrderDate = []
-    miniSellOrderStop = []
-    miniSellOrderLimit = []
-
-    cancelDate = []
-    cancelPrice = []
-
-    bolliThreshList = []
-    bolliThreshDate = []
-    buyBreakerDate = []
-    buyBreaker = []
-    buyBarrierDate = []
-    buyBarrierList = []
-
-    prevThreshDate = []
-    prevThreshList = []
-
-    targetDate = []
-    targetList = []
-    miniTargetDate = []
-    miniTargetList = []
-
+#region: logging header
 header = 'Date,'+\
           'Current Price,'+ \
           'assets,' + \
@@ -142,16 +64,15 @@ header = 'Date,'+\
     'Open Phase Exited,' +\
     'Close Phase Entered,' +\
     'Close Phase Exited'
-
+#endregion
 
 def closedPhase(client, coin, sellPrice=None, margin=None, ):
     global file
-    global counter, data, btcAssets, assets
-    global buyDate, buyPriceList, sellDate, sellPriceList, miniSellDate,miniSellPrice
-    global sellOrderDate,sellOrderStop,sellOrderLimit, buyOrderDate, buyOrderLimit, buyOrderStop
-    global miniSellOrderDate, miniSellOrderLimit, miniSellOrderStop
-    global cancelDate, cancelPrice, buyBarrierDate,buyBarrierList
-    global bolliThreshList,bolliThreshDate,buyBreaker,buyBreakerDate, prevThreshDate, prevThreshList
+    global btcAssets, assets
+
+    print('**********')
+    print('***', coin, 'Closed Phase ***')
+    print('**********')
 
     phaseId = datetime.utcnow()
 
@@ -164,85 +85,58 @@ def closedPhase(client, coin, sellPrice=None, margin=None, ):
     bolliBroken = False
 
     nowTime = None
-    dataPoints = data.iloc[(counter - 7):counter]
 
     if margin != None:
-        # setLimitStop Buy at sellPrice
         buyPrice = sellPrice
         stopBuyTrigger = (1-triggerPercent) * buyPrice
-        # buyQty = assets / buyPrice
-        # price, quantity = formattedPrcQty(coin, price=buyPrice, quantity=buyQty)
-        # buyOrderId = limit_buy(client, pair, quantity=quantity, price=price)
-        # buyOrderId = 1
 
-        # buyOrderDate = buyOrderDate + [dataPoints.iloc[-1].date]
-        # buyOrderStop = buyOrderStop + [stopBuyTrigger]
-        # buyOrderLimit = buyOrderLimit + [buyPrice]
-        #
-        # printerDict={}
-        # printerDict['Date'] = dataPoints.iloc[-1].date
-        # printerDict['assets'] = assets
-        # printerDict['btcAssets'] = btcAssets
-        # printerDict['Buy Order'] = True
-        # printerDict['Stop'] = '%.3f'%(stopBuyTrigger)
-        # printerDict['Limit'] = '%.3f'%(buyPrice)
-        # printerDict['Open Phase Entered'] = phaseId
-        # printer(printerDict, file=file)
 
     else:
         buyOrderId = None
 
-    miniCounter = 0
 
 
     while True:
         try:
+            time.sleep(pollingInterval)
 
-            miniCounter += 1
-            miniCounter = miniCounter % (60 / pollingInterval)
-            if miniCounter == 0:
-                counter += 1
 
-            dataPoints = data.iloc[(counter - 7):counter]
-            if len(dataPoints) < 7:
-                global finalClose
-
-                print('-----END----', file=file)
-                print('USDT', assets, file=file)
-                print('Coin', btcAssets, file=file)
-                print('Final Close', finalClose, file=file)
-                print('TOTAL VALUE', assets + (btcAssets * finalClose), file=file)
-                print(coin, 'TOTAL VALUE', assets + (btcAssets * finalClose),file=file)
-
-                finalValue = assets + (btcAssets * finalClose)
-
-                return 'next', finalValue
+            dataPoints = getPricePanda(client, pair, TRADE_INTERVAL, TRADE_WINDOW)
 
             current = dataPoints.iloc[-1]
-            currentPrice = random.uniform(current.low, current.high)
-
-
             findUptrend = uptrendFinder(dataPoints.iloc[-6:-1],file)
-
-            # if (buyOrderId!= None) and (get_order_status(client,pair,buyOrderId) == Client.ORDER_STATUS_FILLED):
+            currentPrice = get_price(client, pair)
             if (margin != None) and findUptrend and (currentPrice > stopBuyTrigger):
 
                 buyPrice = currentPrice
 
                 margin = margin + (buyPrice * feePercent)
 
-
-                buyDate = buyDate + [current.date]
-                buyPriceList = buyPriceList + [buyPrice]
+                usdtBalance = get_asset_balance(client, 'USDT')
+                if assets > usdtBalance:
+                    # reset and just continue
+                    waitForBuyBreak = False
+                    lowThreshold = 0
+                    bolliDate = datetime(2019, 1, 1)
+                    bolliBroken = False
+                    print('Not enough USDT to spend', file=file)
+                    continue
 
                 buyQty = assets / buyPrice
-                btcAssets = buyQty * (1 - txFee)
+                price, quantity = formattedPrcQty(coin, price=buyPrice, quantity=buyQty)
+                openBuyId = limit_buy(client, pair, quantity=quantity, price=price)
+
+                print('!!Order in!!!', openBuyId, 'price', price, 'qty', quantity)
+                print('waiting for order to fill...', '| current UTC Time', datetime.utcnow())
+
+                time.sleep(6)
+                while (get_order_status(client, pair, openBuyId) != client.ORDER_STATUS_FILLED):
+                    time.sleep(pollingInterval)
+
+                btcAssets = get_asset_balance(client,coin)
                 assets = 0
 
-                # buyOrderDate = buyOrderDate + [dataPoints.iloc[-1].date]
-                # buyOrderStop = buyOrderStop + [stopBuyTrigger]
-                # buyOrderLimit = buyOrderLimit + [buyPrice]
-
+                #region: logging
                 printerDict = {}
                 printerDict['Date'] = current.date
                 printerDict['Current Price'] = currentPrice
@@ -252,55 +146,22 @@ def closedPhase(client, coin, sellPrice=None, margin=None, ):
                 printerDict['Wait Buy Break'] = waitForBuyBreak
                 printerDict['Buy Executed'] = True
                 printerDict['Buy Price'] = buyPrice
+                printerDict['Buy Order'] = openBuyId
                 printerDict['Margin'] = margin
                 printerDict['Open Phase Entered'] = phaseId
                 printer(printerDict,file=file)
-
+                #endregion
 
                 break
 
-            # if fulfilled:
-            #   break. margin = margin + (buyPrice*feePercent).
-            #   Go to open phase.
-
-            # dataPoints = getPricePanda(client, pair, client.KLINE_INTERVAL_1MINUTE, '7 minutes ago UTC')
-
-            # print('----- D-A-T-E ----', dataPoints.iloc[-1].date, file=file)
-
-            # maClose = np.mean(dataPoints.iloc[-6:-1].close)
             maHigh = np.mean(dataPoints.iloc[-6:-1].high)
 
-            # print('waitForBuyBreak:', waitForBuyBreak, file=file)
-
             if waitForBuyBreak:
-
-                hourData = pd.read_csv('030619_to_060619_analysis//' + pair + '_1h.csv')
-                hourData.columns = ['date', 'open', 'high', 'low', 'close', 'vol']
-
-                hourData['date'] = [pd.to_datetime(x) for x in hourData['date']]
-                hourData['low'] = [pd.to_numeric(x) for x in hourData['low']]
-                hourData['high'] = [pd.to_numeric(x) for x in hourData['high']]
-                hourData['open'] = [pd.to_numeric(x) for x in hourData['open']]
-                hourData['close'] = [pd.to_numeric(x) for x in hourData['close']]
-
-                hourBehind = dataPoints.iloc[-1].date - timedelta(days=1)
-                whichHour = None
-                for i in range(len(hourData)):
-                    if hourData.iloc[i].date > hourBehind:
-                        whichHour = i - 1
-
-
-                        break
-
-                hourPoint = hourData.iloc[whichHour]
+                hourPoint = getPricePanda(client, pair, client.KLINE_INTERVAL_1HOUR, '120 minutes ago UTC')
+                hourPoint = hourPoint.iloc[0]
                 buyBarrier = (hourPoint.high - hourPoint.low) * buyBarrierFactor + hourPoint.low
 
                 buyBreakThresh = maHigh * buyBreakPercent
-
-                buyBreakerDate = buyBreakerDate + [current.date]
-                buyBreaker = buyBreaker + [buyBreakThresh]
-                buyBarrierDate = buyBarrierDate + [current.date]
-                buyBarrierList = buyBarrierList + [buyBarrier]
 
                 buyingUptrend = uptrendFinder(uptrendData=dataPoints[-5:-1],file=file)
 
@@ -308,37 +169,46 @@ def closedPhase(client, coin, sellPrice=None, margin=None, ):
                     # put in buy limit order for currentPrice * buyBreakLimit
 
                     if margin!=None:
-                        ### CANCEL stop buy order ###
-                        cancelDate = cancelDate + [current.date]
-                        cancelPrice = cancelPrice + [buyPrice]
-
+                        #region: logging
                         printerDict={}
                         printerDict['Date'] = current.date
-                        printerDict['Current Price'] =  currentPrice
+                        printerDict['Current Price'] = currentPrice
                         printerDict['assets'] = assets
                         printerDict['btcAssets'] = btcAssets
                         printerDict['Bolli Broken'] = bolliBroken
                         printerDict['Wait Buy Break'] = waitForBuyBreak
-                        printerDict['Buy Order Cancelled'] = buyPrice
+                        printerDict['Buy Order Cancel'] = buyPrice
                         printerDict['Open Phase Entered'] = phaseId
                         printer(printerDict,file)
+                        #endregion
+
+                    usdtBalance = get_asset_balance(client, 'USDT')
+                    if assets > usdtBalance:
+                        # reset and just continue
+                        waitForBuyBreak = False
+                        lowThreshold = 0
+                        bolliDate = datetime(2019, 1, 1)
+                        bolliBroken = False
+                        print('Not enough USDT to spend', file=file)
+                        continue
 
                     buyPrice = currentPrice
                     buyQty = assets / buyPrice
                     price, quantity = formattedPrcQty(coin, price=buyPrice, quantity=buyQty)
-                    # openBuyId = limit_buy(client, pair, quantity=quantity, price=price)
+                    openBuyId = limit_buy(client, pair, quantity=quantity, price=price)
+
+                    print('!!Order in!!!', openBuyId, 'price', price, 'qty', quantity)
+
+                    # wait for order to be filled
+                    # while len(get_open_orders(client,pair))>0:
+                    print('waiting for order to fill...', '| current Time', datetime.utcnow())
+                    time.sleep(6)
+                    while (get_order_status(client, pair, openBuyId) != client.ORDER_STATUS_FILLED):
+                        time.sleep(pollingInterval)
 
                     assets = 0
-                    btcAssets = buyQty * (1 - txFee)
-
-                    buyDate = buyDate + [current.date]
-                    buyPriceList = buyPriceList + [buyPrice]
-                    # print('Regular Buy Filled at price:', buyPrice, file=file)
-
+                    btcAssets = get_asset_balance(client,coin)
                     waitForBuyBreak = False
-
-                    # print('BUY AT:', buyPrice, 'buy qty:', buyQty, 'after tx fee', btcAssets, file=file)
-
                     break
 
             if dataPoints.iloc[-1].date == nowTime:
@@ -346,10 +216,8 @@ def closedPhase(client, coin, sellPrice=None, margin=None, ):
 
             nowTime = dataPoints.iloc[-1].date
 
-            # print('bolliBroken:', bolliBroken, file=file)
             if bolliBroken:
                 bolliTimeSince = current.date - bolliDate
-                # print('Bolli Time Since:', bolliTimeSince, file=file)
 
                 if bolliTimeSince.seconds > bolliDelay:
                     # reset
@@ -358,9 +226,6 @@ def closedPhase(client, coin, sellPrice=None, margin=None, ):
                     lowThreshold = 0
 
                 prevLowest = lowThreshold * buyMargin
-                if prevLowest >0:
-                    prevThreshDate = prevThreshDate + [current.date]
-                    prevThreshList = prevThreshList + [prevLowest]
 
                 if currentPrice < prevLowest:
                     waitForBuyBreak = True
@@ -373,39 +238,28 @@ def closedPhase(client, coin, sellPrice=None, margin=None, ):
             latestLow = latestBar.low
             bolliThresh = latestBolliValue * belowBolliPercent
 
-            bolliThreshDate = bolliThreshDate + [latestBar.date]
-            bolliThreshList = bolliThreshList + [bolliThresh]
-
-
-
-
-
             if (latestLow < bolliThresh) and (latestLow != lowThreshold):
                 lowThreshold = latestLow
                 bolliDate = latestBar.date
                 bolliBroken = True
 
-
-
-
-
-        except (ConnectionError, ConnectionAbortedError, ConnectionRefusedError, ConnectionResetError,
-                OSError) as e:
-
-            try:
-                errorHandler(e, file=file)
-                time.sleep(10)
-            except (KeyboardInterrupt):
-                print('Saving files..', file=file)
-                putUSDTToBasket(coin + '.txt', assets)
-                print('Files saved.', file=file)
-                exit('Shut down complete.')
+        # except (ConnectionError, ConnectionAbortedError, ConnectionRefusedError, ConnectionResetError,
+        #         OSError) as e:
+        #
+        #     try:
+        #         errorHandler(e, file=file)
+        #         time.sleep(10)
+        #     except (KeyboardInterrupt):
+        #         print('Saving files..', file=file)
+        #         # putUSDTToBasket(coin + '.txt', assets)
+        #         # print('Files saved.', file=file)
+        #         exit('Shut down complete.')
 
         except(BinanceAPIException, BinanceOrderException, BinanceOrderMinAmountException,
                BinanceOrderMinPriceException,
                BinanceOrderMinTotalException, BinanceOrderUnknownSymbolException, BinanceRequestException) as e:
             errorHandler(e, file=file)
-            print("Binance API Error", file=file)
+            print("Binance API Error",e, file=file)
 
             exit(3000)
 
@@ -416,10 +270,11 @@ def closedPhase(client, coin, sellPrice=None, margin=None, ):
             finally:
                 print('*** Current USDT Allocation:', assets, '***', file=file)
                 print('Saving files..', file=file)
-                putUSDTToBasket(coin + '.txt', assets)
-                print('Files saved.', file=file)
+                # putUSDTToBasket(coin + '.txt', assets)
+                # print('Files saved.', file=file)
                 exit('Shut down complete.')
 
+        #region: logging
         printerDict = {}
         printerDict['Date'] = current.date
         printerDict['Current Price'] = currentPrice
@@ -431,8 +286,9 @@ def closedPhase(client, coin, sellPrice=None, margin=None, ):
         printerDict['Margin'] = margin
         printerDict['Open Phase Entered'] = phaseId
         printer(printerDict,file)
+        #endregion
 
-    
+    #region: logging
     printerDict={}
     printerDict['Date'] = current.date
     printerDict['Current Price'] = currentPrice
@@ -444,65 +300,64 @@ def closedPhase(client, coin, sellPrice=None, margin=None, ):
     printerDict['Margin'] = margin
     printerDict['Open Phase Exited'] = phaseId
     printer(printerDict,file)
+    #endregion
 
-    counter += 1
     result, assets = openPhase(client, coin, buyPrice, margin)
-
-    # print('Returned to Closed Phase ID', phaseId, file=file)
-    # print('', file=file)
-
 
     return result, assets
 
 
 def openPhase(client, coin, buyPrice=None, margin=None, ):
     global file
-    global counter, data, btcAssets, assets
+    global btcAssets, assets
 
-    global buyDate, buyPriceList, sellDate, sellPriceList, miniSellDate,miniSellPrice
-    global sellOrderDate,sellOrderStop,sellOrderLimit, buyOrderDate, buyOrderLimit, buyOrderStop
-    global miniSellOrderDate, miniSellOrderLimit, miniSellOrderStop
-    global cancelDate, cancelPrice, targetDate, targetList, miniTargetDate, miniTargetList
-    global bolliThreshList, bolliThreshDate, buyBreaker, buyBreakerDate
-
-
-    phaseId = datetime.utcnow()
-    # print('Open Phase ID', phaseId, file=file)
-
-    dataPoints = data.iloc[(counter - 7):counter]
+    print('**********')
+    print('***', coin, 'Open Phase ***')
+    print('**********')
 
     pair = coin + 'USDT'
+    phaseId = datetime.utcnow()
+    dataPoints = getPricePanda(client, pair, TRADE_INTERVAL, TRADE_WINDOW)
+
     if margin == None:
         margin = profitPercent * buyPrice
     target = buyPrice + margin
     miniTarget = buyPrice * (1+subprofitPercent)
 
-    targetDate = targetDate + [dataPoints.iloc[-1].date]
-    targetList = targetList + [target]
-    miniTargetDate = miniTargetDate + [dataPoints.iloc[-1].date]
-    miniTargetList = miniTargetList + [miniTarget]
+    btcAssets = get_asset_balance(client,coin)
 
-
-    # print('buyPrice', buyPrice, 'margin', margin, 'assets', assets, 'TARGET', target, file=file)
-
-    # set stop limit sell
+    # region: set stop limit sell
     sellPrice = buyPrice * dropPercent
     sellDropStop = sellPrice * (1 + triggerPercent)
     limitPrice, sellQty = formattedPrcQty(coin, sellPrice, btcAssets)
-    sellDropStopfrmtd, sellQty = formattedPrcQty(coin, sellDropStop, btcAssets)
-    # sellOrderId = limit_sell(client,pair,sellQty,limitPrice) # sell limit
+    sellDropStopfrmtd = formattedPrcQty(coin, sellDropStop)
 
-    # print('Drop Sell Order In At Price:', limitPrice, 'Trigger:', sellDropStop, file=file)
+    print('==== BTC ASSETS ====', btcAssets)
+    print('==== sellQty =======', sellQty)
 
-    sellOrderDate = sellOrderDate + [dataPoints.iloc[-1].date]
-    sellOrderStop = sellOrderStop + [sellDropStop]
-    sellOrderLimit = sellOrderLimit + [sellPrice]
+
+    try:
+        stopSellId = stop_limit_sell(client, pair, quantity=sellQty, stopprice=sellDropStopfrmtd, limitprice=limitPrice)
+        print('!! Exit S-E-L-L order in !!', 'order num', stopSellId, 'stop', sellDropStopfrmtd, 'limit', limitPrice,
+              'qty', sellQty)
+
+    except(BinanceAPIException, BinanceOrderException, BinanceOrderMinAmountException,
+           BinanceOrderMinPriceException,
+           BinanceOrderMinTotalException, BinanceOrderUnknownSymbolException,
+           BinanceRequestException) as e:
+        print(e)
+        print("Binance API Error",e,file=file)
+        if str(e).strip() == 'APIError(code=-2010): Order would trigger immediately.':
+            stopSellId = limit_sell(client, pair, sellQty, limitPrice)
+            print('LIMIT SELL', stopSellId)
+        else:
+            exit(3000)
+    #endregion
 
     openSellId = None  # sell stop limit
     miniSellId = None
 
-    miniCounter = 0
-
+    #region:logging
     printerDict = {}
     printerDict['Date'] = dataPoints.iloc[-1].date
     printerDict['assets'] = assets
@@ -512,40 +367,22 @@ def openPhase(client, coin, buyPrice=None, margin=None, ):
     printerDict['Drop Threshold'] = sellDropStop
     printerDict['Close Phase Entered'] = phaseId
     printer(printerDict,file)
+    #endregion
 
     while True:
-        miniCounter += 1
-        miniCounter = miniCounter % (60 / pollingInterval)
-        if miniCounter == 0:
-            counter += 1
-
-        dataPoints = data.iloc[(counter - 7):counter]
-        if len(dataPoints) < 7:
-            global finalClose
-
-            print('-----END----', file=file)
-            print('USDT', assets, file=file)
-            print('Coin', btcAssets, file=file)
-            print('Final Close', finalClose, file=file)
-            print('TOTAL VALUE', assets + (btcAssets * finalClose), file=file)
-            print(coin, 'TOTAL VALUE', assets + (btcAssets * finalClose),file=file)
-
-            finalValue = assets + (btcAssets * finalClose)
-
-            return 'next', finalValue
-
+        time.sleep(pollingInterval)
+        dataPoints = getPricePanda(client, pair, TRADE_INTERVAL, TRADE_WINDOW)
         current = dataPoints.iloc[-1]
-        currentPrice = random.uniform(current.low, current.high)
+        currentPrice = get_price(client,pair)
 
-        # print('----- D-A-T-E ----', dataPoints.iloc[-1].date, currentPrice, file=file)
-
-        if (currentPrice < sellDropStop):
+        if (get_order_status(client,pair,stopSellId) == Client.ORDER_STATUS_FILLED):
+            print("Exit Sell Completed", stopSellId)
             if openSellId!=None:
                 #cancel open sells
 
-                cancelDate = cancelDate + [current.date]
-                cancelPrice = cancelPrice + [sellLimit]
-
+                cancel_order(client,pair,openSellId)
+                print('Main Sell Cancelled', openSellId)
+                #region: logging
                 printerDict = {}
                 printerDict['Date'] = current.date
                 printerDict['Current Price'] = currentPrice
@@ -555,15 +392,35 @@ def openPhase(client, coin, buyPrice=None, margin=None, ):
                 printerDict['Close Phase Entered'] = phaseId
                 printer(printerDict, file)
                 openSellId = None
+                #endregion
 
-            # sellPrice = sellLimit
+            if miniSellId!=None:
+                #cancel open sells
 
-            totalUSDT = sellPrice * btcAssets
+                cancel_order(client,pair,miniSellId)
+                print('mini Sell Cancelled', miniSellId)
+                #region: logging
+                printerDict = {}
+                printerDict['Date'] = current.date
+                printerDict['Current Price'] = currentPrice
+                printerDict['assets'] = assets
+                printerDict['btcAssets'] = btcAssets
+                printerDict['Mini Sell Order Cancelled'] = miniSellId
+                printerDict['Close Phase Entered'] = phaseId
+                printer(printerDict, file)
+                miniSellId = None
+                #endregion
+
+
+            sellPrice, totalUSDT = get_order_price_cumQty(client,pair,stopSellId)
 
             assets = (1 - txFee) * totalUSDT
             btcAssets = 0
 
+            loss = (sellPrice * feePercent) + (buyPrice - sellPrice)
+            margin = margin + loss
 
+            #region: logging
             printerDict = {}
             printerDict['Date'] = current.date
             printerDict['Current Price'] = currentPrice
@@ -574,200 +431,164 @@ def openPhase(client, coin, buyPrice=None, margin=None, ):
             printerDict['Drop Threshold'] = sellDropStop
             printerDict['Close Phase Entered'] = phaseId
             printer(printerDict,file)
-
-            sellPrice= currentPrice
-            loss = (sellPrice * feePercent) + (buyPrice - sellPrice)
-            margin = margin + loss
-            # print('Drop SELL filled at price:', sellPrice, 'new margin:', margin, file=file)
-
-            sellDate = sellDate + [current.date]
-            sellPriceList = sellPriceList + [sellPrice]
+            #endregion
 
             break
 
-        if openSellId!=None and (currentPrice < sellStop):
+        if openSellId!=None:
+            if (get_order_status(client,pair,openSellId) == Client.ORDER_STATUS_FILLED):
+                sellPrice, totalUSDT = get_order_price_cumQty(client, pair, openSellId)
 
-            sellPrice = sellLimit
+                assets = (1 - txFee) * totalUSDT
+                btcAssets = 0
+                #region: loggig
+                printerDict = {}
+                printerDict['Date'] = current.date
+                printerDict['Current Price'] = currentPrice
+                printerDict['assets'] = assets
+                printerDict['btcAssets'] = btcAssets
+                printerDict['Sell Executed'] = True
+                printerDict['Sell Price'] = sellPrice
+                printerDict['Close Phase Exited'] = phaseId
+                printerDict['Target'] = target
+                printerDict['Margin'] = margin
+                printer(printerDict,file)
+                #endregion
+                openSellId = None
 
-            totalUSDT = sellPrice * btcAssets
+                return True, assets
 
-            assets = (1 - txFee) * totalUSDT
-            btcAssets = 0
+        if miniSellId != None:
+            if (get_order_status(client,pair,miniSellId) == Client.ORDER_STATUS_FILLED):
+                sellPrice, totalUSDT = get_order_price_cumQty(client, pair, miniSellId)
 
-            printerDict = {}
-            printerDict['Date'] = current.date
-            printerDict['Current Price'] = currentPrice
-            printerDict['assets'] = assets
-            printerDict['btcAssets'] = btcAssets
-            printerDict['Sell Executed'] = True
-            printerDict['Sell Price'] = sellPrice
-            printerDict['Close Phase Exited'] = phaseId
-            printerDict['Target'] = target
-            printerDict['Margin'] = margin
-            printer(printerDict,file)
+                assets = (1 - txFee) * totalUSDT
+                btcAssets = 0
+                loss = (sellPrice * feePercent) + (buyPrice - sellPrice)
+                margin = margin + loss
 
+                #region: logging
+                printerDict = {}
+                printerDict['Date'] = current.date
+                printerDict['Current Price'] = currentPrice
+                printerDict['assets'] = assets
+                printerDict['btcAssets'] = btcAssets
+                printerDict['Mini Sell Executed'] = True
+                printerDict['Mini Sell Price'] = sellPrice
+                printerDict['Close Phase Exited'] = phaseId
+                printerDict['Target'] = target
+                printerDict['Margin'] = margin
+                printer(printerDict,file)
+                #endregion
 
-            # print('SELL order Filled', openSellId, 'at price', sellPrice, 'Total USDT:', assets, file=file)
-            # print('Closing Open Phase Id', phaseId, file=file)
+                openSellId = None
+                miniSellId = None
 
-            openSellId = None
-
-            sellDate = sellDate + [current.date]
-            sellPriceList = sellPriceList + [sellPrice]
-
-            return True, assets
-
-        if miniSellId != None and (currentPrice < miniSellStop):
-            sellPrice = miniSellLimit
-
-            totalUSDT = sellPrice * btcAssets
-
-            assets = (1 - txFee) * totalUSDT
-            btcAssets = 0
-
-            printerDict = {}
-            printerDict['Date'] = current.date
-            printerDict['Current Price'] = currentPrice
-            printerDict['assets'] = assets
-            printerDict['btcAssets'] = btcAssets
-            printerDict['Mini Sell Executed'] = True
-            printerDict['Mini Sell Price'] = sellPrice
-            printerDict['Close Phase Exited'] = phaseId
-            printerDict['Target'] = target
-            printerDict['Margin'] = margin
-            printer(printerDict,file)
-
-
-
-
-            # print('Mini SELL order Filled', miniSellId, 'at price', sellPrice, 'Total USDT:', assets, file=file)
-            # print('Closing Open Phase Id', phaseId, file=file)
-
-            miniSellDate = miniSellDate + [current.date]
-            miniSellPrice = miniSellPrice + [sellPrice]
-
-            openSellId = None
-            miniSellId = None
-
-            # print()
-            # print('margin', margin)
-            # print('buy-sell', buyPrice-sellPrice)
-
-            loss = (sellPrice * feePercent) + (buyPrice - sellPrice)
-            margin = margin + loss
-
-            # print('loss', loss)
-            # print('newMargin', margin)
-
-            break
+                break
 
         upTrendFound = uptrendFinder(dataPoints.iloc[-5:-1],file)
-
-        # print('Date:', current.date, 'upTrend found:',upTrendFound,file=file)
-        # print(dataPoints.iloc[-5:-1],file=file)
-
 
         if (not upTrendFound) and ((currentPrice * gap) > target):
             # #sellFinish
 
-            if True:
-                if miniSellId != None:
-                    ## CANCEL mini sell ###
-                    cancelDate = cancelDate + [current.date]
-                    cancelPrice = cancelPrice + [miniSellLimit]
-                    printerDict = {}
-                    printerDict['Date'] = current.date
-                    printerDict['Current Price'] = currentPrice
-                    printerDict['assets'] = assets
-                    printerDict['btcAssets'] = btcAssets
-                    printerDict['Target'] = target
-                    printerDict['Margin'] = margin
-                    printerDict['Drop Threshold'] = sellDropStop
-                    printerDict['Mini Sell Order Cancelled'] = miniSellId
-                    printerDict['Close Phase Entered'] = phaseId
-                    printer(printerDict, file)
-
-                    miniSellId = None
-
-                if openSellId != None:
-                    ### CANCEL the previous SELL STOP ###
-                    cancelDate = cancelDate + [current.date]
-                    cancelPrice = cancelPrice + [sellLimit]
-
-                    printerDict = {}
-                    printerDict['Date'] = current.date
-                    printerDict['Current Price'] = currentPrice
-                    printerDict['assets'] = assets
-                    printerDict['btcAssets'] = btcAssets
-                    printerDict['Target'] = target
-                    printerDict['Margin'] = margin
-                    printerDict['Drop Threshold'] = sellDropStop
-                    printerDict['Sell Order Cancelled'] = openSellId
-                    printerDict['Close Phase Entered'] = phaseId
-                    printer(printerDict, file)
+            if miniSellId != None:
+                ## CANCEL mini sell ###
+                cancel_order(client,pair,miniSellId)
+                miniSellId = None
+                #region: logging
+                printerDict = {}
+                printerDict['Date'] = current.date
+                printerDict['Current Price'] = currentPrice
+                printerDict['assets'] = assets
+                printerDict['btcAssets'] = btcAssets
+                printerDict['Target'] = target
+                printerDict['Margin'] = margin
+                printerDict['Drop Threshold'] = sellDropStop
+                printerDict['Mini Sell Order Cancelled'] = miniSellId
+                printerDict['Close Phase Entered'] = phaseId
+                printer(printerDict, file)
+                #endregion
 
 
-                    openSellId += 1
+            if openSellId != None:
+                ### CANCEL the previous SELL STOP ###
+                cancel_order(client,pair,openSellId)
+                openSellId = None
+                #region: logging
+                printerDict = {}
+                printerDict['Date'] = current.date
+                printerDict['Current Price'] = currentPrice
+                printerDict['assets'] = assets
+                printerDict['btcAssets'] = btcAssets
+                printerDict['Target'] = target
+                printerDict['Margin'] = margin
+                printerDict['Drop Threshold'] = sellDropStop
+                printerDict['Sell Order Cancelled'] = openSellId
+                printerDict['Close Phase Entered'] = phaseId
+                printer(printerDict, file)
+                #endregion
+
+            # Cancel exit drop stop
+            stopSellStatus = get_order_status(client, pair, stopSellId)
+            if (stopSellStatus!=Client.ORDER_STATUS_FILLED) and (stopSellStatus!=Client.ORDER_STATUS_CANCELED):
+                cancel_order(client,pair,stopSellId)
+                print("Exit Sell Cancelled", stopSellId)
+
+            # set stop and limit
+
+            # region: set stop limit sell
+            sellStop = currentPrice * sellStopPercent
+            sellLimit = currentPrice * sellLimitPercent
+            stopPrice, sellQty = formattedPrcQty(coin, sellStop, btcAssets)
+            limitPrice = formattedPrcQty(coin, sellLimit)
+
+            try:
+                openSellId = stop_limit_sell(client, pair, quantity=sellQty, stopprice=stopPrice,
+                                             limitprice=limitPrice)
+                print('!! MAIN S-E-L-L !!', 'order num', openSellId, 'stop', stopPrice, 'limit', limitPrice,
+                      'qty', sellQty)
+
+            except(BinanceAPIException, BinanceOrderException, BinanceOrderMinAmountException,
+                   BinanceOrderMinPriceException,
+                   BinanceOrderMinTotalException, BinanceOrderUnknownSymbolException,
+                   BinanceRequestException) as e:
+                print(e)
+                print("Binance API Error",e,file=file)
+                if str(e).strip() == 'APIError(code=-2010): Order would trigger immediately.':
+                    openSellId = limit_sell(client, pair, sellQty, limitPrice)
+                    print('MAIN LIMIT SELL', openSellId)
                 else:
-                    openSellId = 1
+                    exit(3000)
+            # endregion
 
-                # set stop and limit
-                sellStop = currentPrice * sellStopPercent
-                sellLimit = currentPrice * sellLimitPercent
-                stopPrice, sellQty = formattedPrcQty(coin, sellStop, btcAssets)
-                limitPrice, sellQty = formattedPrcQty(coin, sellLimit, btcAssets)
+            target = sellStop
+            #region: logging
+            printerDict = {}
+            printerDict['Date'] = current.date
+            printerDict['Current Price'] = currentPrice
+            printerDict['assets'] = assets
+            printerDict['btcAssets'] = btcAssets
+            printerDict['Sell Order'] = True
+            printerDict['Sell Stop'] = sellStop
+            printerDict['Sell Limit'] = sellLimit
+            printerDict['Close Phase Entered'] = phaseId
+            printerDict['Target'] = target
+            printerDict['Margin'] = margin
+            printer(printerDict, file)
+            #endregion
 
-                target = sellStop
-
-                targetDate = targetDate + [dataPoints.iloc[-1].date]
-                targetList = targetList + [target]
-
-                try:
-
-                    printerDict = {}
-                    printerDict['Date'] = current.date
-                    printerDict['Current Price'] = currentPrice
-                    printerDict['assets'] = assets
-                    printerDict['btcAssets'] = btcAssets
-                    printerDict['Sell Order'] = True
-                    printerDict['Sell Stop'] = sellStop
-                    printerDict['Sell Limit'] = sellLimit
-                    printerDict['Close Phase Entered'] = phaseId
-                    printerDict['Target'] = target
-                    printerDict['Margin'] = margin
-                    printer(printerDict, file)
-
-                    # print('Sell Stop Order Put In', 'order num', openSellId, 'stop', stopPrice, 'limit', limitPrice,
-                    #       'qty', sellQty, file=file)
-
-                    sellOrderDate = sellOrderDate + [current.date]
-                    sellOrderLimit = sellOrderLimit + [sellLimit]
-                    sellOrderStop = sellOrderStop + [sellStop]
-
-                    continue
-                except(BinanceAPIException, BinanceOrderException, BinanceOrderMinAmountException,
-                       BinanceOrderMinPriceException,
-                       BinanceOrderMinTotalException, BinanceOrderUnknownSymbolException,
-                       BinanceRequestException) as e:
-                    errorHandler(e, file=file)
-                    print("Binance API Error", file=file)
-                    if str(e).strip() == 'APIError(code=-2010): Order would trigger immediately.':
-                        openSellId = limit_sell(client, pair, sellQty, limitPrice)
-                        print('CONTINGENCY LIMIT SELL', openSellId, file=file)
-                        continue
-                    else:
-                        exit(3000)
 
         else: # (currentPrice * gap) <= target
             if (not upTrendFound) and ((currentPrice*gap) > miniTarget):
-                gains, losses = gainLossCounter(data.iloc[(counter - 7):counter])
+                gains, losses = gainLossCounter(dataPoints[:-1])
                 choiceList = [True]*losses + [False] * gains
                 toSellOrNotToSell = random.choice(choiceList)
 
                 if toSellOrNotToSell:
                     if miniSellId != None:
                         ### CANCEL the previous SELL STOP ###
-
+                        cancel_order(client,pair,miniSellId)
+                        #region: logging
                         printerDict = {}
                         printerDict['Date'] = current.date
                         printerDict['Current Price'] = currentPrice
@@ -779,324 +600,143 @@ def openPhase(client, coin, buyPrice=None, margin=None, ):
                         printerDict['Mini Sell Order Cancelled'] = miniSellId
                         printerDict['Close Phase Entered'] = phaseId
                         printer(printerDict, file)
+                        #endregion
 
-                        miniSellId += 1
-                    else:
-                        miniSellId = 1
-
-                    # set stop and limit
-                    miniSellStop = currentPrice * sellStopPercent
-                    miniSellLimit = currentPrice * sellLimitPercent
-                    stopPrice, sellQty = formattedPrcQty(coin, miniSellStop, btcAssets)
-                    limitPrice, sellQty = formattedPrcQty(coin, miniSellLimit, btcAssets)
-
-                    miniTarget = miniSellStop
-                    miniTargetDate = miniTargetDate + [dataPoints.iloc[-1].date]
-                    miniTargetList = miniTargetList + [miniTarget]
-
-                    if miniTarget > target:
-                        target = miniTarget
-                        targetDate = targetDate + [dataPoints.iloc[-1].date]
-                        targetList = targetList + [target]
-
-                    try:
-
-                        # print('Mini Sell Stop Order Put In', 'order num', openSellId, 'stop', stopPrice, 'limit', limitPrice,
-                        #       'qty', sellQty, file=file)
-
+                    if openSellId != None:
+                        ### CANCEL the previous SELL STOP ###
+                        cancel_order(client, pair, openSellId)
+                        openSellId = None
+                        # region: logging
                         printerDict = {}
                         printerDict['Date'] = current.date
                         printerDict['Current Price'] = currentPrice
                         printerDict['assets'] = assets
                         printerDict['btcAssets'] = btcAssets
-                        printerDict['Mini Sell Order'] = True
-                        printerDict['Mini Sell Stop'] = miniSellStop
-                        printerDict['Mini Sell Limit'] = miniSellLimit
-                        printerDict['Close Phase Entered'] = phaseId
                         printerDict['Target'] = target
                         printerDict['Margin'] = margin
+                        printerDict['Drop Threshold'] = sellDropStop
+                        printerDict['Sell Order Cancelled'] = openSellId
+                        printerDict['Close Phase Entered'] = phaseId
                         printer(printerDict, file)
+                        # endregion
 
-                        miniSellOrderDate = miniSellOrderDate + [current.date]
-                        miniSellOrderStop = miniSellOrderStop + [miniSellStop]
-                        miniSellOrderLimit = miniSellOrderLimit + [miniSellLimit]
+                    # Cancel exit drop stop
+                    stopSellStatus = get_order_status(client, pair, stopSellId)
+                    if (stopSellStatus != Client.ORDER_STATUS_FILLED) and (stopSellStatus != Client.ORDER_STATUS_CANCELED):
+                        cancel_order(client, pair, stopSellId)
+                        print("Exit Sell Cancelled", stopSellId)
 
-                        continue
+                    # region: set stop limit sell
+                    miniSellStop = currentPrice * sellStopPercent
+                    miniSellLimit = currentPrice * sellLimitPercent
+                    stopPrice, sellQty = formattedPrcQty(coin, miniSellStop, btcAssets)
+                    limitPrice = formattedPrcQty(coin, miniSellLimit)
+
+                    try:
+                        miniSellId = stop_limit_sell(client, pair, quantity=sellQty, stopprice=stopPrice,
+                                                     limitprice=limitPrice)
+                        print('!! mini S-E-L-L !!', 'order num', miniSellId, 'stop', stopPrice, 'limit', limitPrice,
+                              'qty', sellQty)
+
                     except(BinanceAPIException, BinanceOrderException, BinanceOrderMinAmountException,
                            BinanceOrderMinPriceException,
                            BinanceOrderMinTotalException, BinanceOrderUnknownSymbolException,
                            BinanceRequestException) as e:
-                        errorHandler(e, file=file)
-                        print("Binance API Error", file=file)
+                        print(e)
+                        print("Binance API Error",e,file=file)
                         if str(e).strip() == 'APIError(code=-2010): Order would trigger immediately.':
-                            openSellId = limit_sell(client, pair, sellQty, limitPrice)
-                            print('CONTINGENCY LIMIT SELL', openSellId, file=file)
-                            continue
+                            miniSellId = limit_sell(client, pair, sellQty, limitPrice)
+                            print('mini LIMIT SELL', miniSellId)
                         else:
                             exit(3000)
+                    # endregion
 
-    counter += 1
+
+                    miniTarget = miniSellStop
+
+                    if miniTarget > target:
+                        target = miniTarget
+                    #region: logging
+                    printerDict = {}
+                    printerDict['Date'] = current.date
+                    printerDict['Current Price'] = currentPrice
+                    printerDict['assets'] = assets
+                    printerDict['btcAssets'] = btcAssets
+                    printerDict['Mini Sell Order'] = True
+                    printerDict['Mini Sell Stop'] = miniSellStop
+                    printerDict['Mini Sell Limit'] = miniSellLimit
+                    printerDict['Close Phase Entered'] = phaseId
+                    printerDict['Target'] = target
+                    printerDict['Margin'] = margin
+                    printer(printerDict, file)
+                    #endregion
+                    continue
+
+
+
     result, assets = closedPhase(client, coin, sellPrice, margin)
     print('Returned to Open Phase Id', phaseId, file=file)
     return result, assets
 
 
-def lubinance(coin, interval, seed=37):
-    random.seed(seed)
+def lubinance(coin):
+
+
+    print('**********')
+    print('***', coin, '***')
+    print('**********')
+
+    # random.seed(seed)
     pair = coin + 'USDT'
     global file
-    global counter, data, finalClose, btcAssets, assets
+    global btcAssets, assets
 
-    global buyDate, buyPriceList, sellDate, sellPriceList, miniSellDate,miniSellPrice
-    global sellOrderDate,sellOrderStop,sellOrderLimit, buyOrderDate, buyOrderLimit
-    global miniSellOrderDate, miniSellOrderLimit, miniSellOrderStop
-    global bolliThreshList, bolliThreshDate, buyBreaker, buyBreakerDate, prevThreshList, prevThreshDate
-    global targetDate,targetList, miniTargetDate, miniTargetList
 
-    counter = 7
-    resetter()
 
-    print('Beginning Sim,', coin, 'assets', assets, 'seed', seed)
-    file = open("logs//" + coin + '_' + str(seed) + '_'+ interval+ '_' + datetime.utcnow().strftime("%d%m%y_%H:%M:%S") + ".csv", "a")
+    file = open("logs//" + coin + '_' + datetime.utcnow().strftime("%d%m%y_%H:%M:%S") + ".csv", "a")
     print(header,file=file)
 
-    # client = Client(apiK, sK)
-    client = None
+    client = Client(apiK, sK)
 
+    assets = pieChunk(client,piePercent=piePercent)
+    initial_assets = assets
 
-    data.columns = ['date', 'open', 'high', 'low', 'close', 'vol']
-
-    data['date'] = [pd.to_datetime(x) for x in data['date']]
-    data['low'] = [pd.to_numeric(x) for x in data['low']]
-    data['high'] = [pd.to_numeric(x) for x in data['high']]
-    data['open'] = [pd.to_numeric(x) for x in data['open']]
-    data['close'] = [pd.to_numeric(x) for x in data['close']]
-
-    length = len(data) - counter
-
-    print('Running sim on', pair, 'data, 29 May 2019 to 31 May 2019 UTC', file=file)
-    dataOpen = data.iloc[0].open
-    dataClose = data.iloc[-1].close
-
-    percentChange = 100 * (dataClose - dataOpen) / dataOpen
-    print("Actual % change over period", percentChange)
-    print()
-
-    finalClose = data.iloc[-1].close
-
-    while counter < length:
+    print('Initial USDT', assets)
+    print('Initial USDT', assets,file=file)
+    while True:
 
         case, assets = closedPhase(client, coin, sellPrice=None, margin=None)
 
-        if case == 'next':
-            # region: charts
-            # mainData = Candlestick(open=data.open, high=data.high, low=data.low, close=data.close, x=data.date)
-            #
-            # bolliDate = []
-            # bolliLow = []
-            #
-            # for i,r in data.iterrows():
-            #     if i<8: continue
-            #
-            #     bolliDate.append(r.date)
-            #     bolliLow.append(bollingerLow(data.iloc[i-5:i].close))
-            #
-            #
-            #
-            # bolliData = Scatter(name='Bolli',x=bolliDate,y=bolliLow,marker=dict(color='navy',size=4))
-            # prevThreshData = Scatter(name='prevLow',x=prevThreshDate,y=prevThreshList,mode='markers',marker=dict(symbol='square',color='red',size=3))
-            # buyBreakData = Scatter(name='buyBreak',x=buyBreakerDate,y=buyBreaker,mode='markers',marker=dict(symbol='square',color='brown',size=3))
-            # buyBarrierData = Scatter(name='buyBar',x=buyBarrierDate,y=buyBarrierList,mode='markers',marker=dict(symbol='square',color='blue',size=3))
-            # targetData =Scatter(name='target',x=targetDate,y=targetList,mode='markers',marker=dict(symbol='triangle-up',color='blue',size=4))
-            # miniTargetData = Scatter(name='miniTarget',x=miniTargetDate,y=miniTargetList,mode='markers',marker=dict(symbol='triangle-up',color='pink',size=3))
-            #
-            # buyData = Scatter(name= 'Buy',mode='markers', marker=dict(symbol = 'circle-open-dot',color='royalblue', size=14), x=buyDate, y=buyPriceList)
-            # sellData = Scatter(name='Sell',mode='markers', marker=dict(symbol='circle-open-dot',color = 'black', size=14), x=sellDate, y=sellPriceList)
-            # miniSellData = Scatter(name='miniSell',mode='markers', marker=dict(symbol='circle-open-dot',color='darkgreen', size=10), x=miniSellDate, y=miniSellPrice)
-            #
-            # buyStopData = Scatter(name='buyStop',mode='markers', marker=dict(symbol='diamond',color='black', size=7), x=buyOrderDate, y=buyOrderStop)
-            # buyLimitData = Scatter(name='buyLimit',mode='markers', marker=dict(symbol='diamond-open',color='black', size=7), x=buyOrderDate, y=buyOrderLimit)
-            #
-            # sellStopData = Scatter(name='sellStop',mode='markers', marker=dict(symbol='diamond',color='orange', size=7), x=sellOrderDate, y=sellOrderStop)
-            # sellLimitData = Scatter(name='sellLimit',mode='markers', marker=dict(symbol='diamond-open',color='orange', size=7), x=sellOrderDate,
-            #                         y=sellOrderLimit)
-            #
-            # miniSellStopData = Scatter(name='miniSellStop',mode='markers', marker=dict(symbol='diamond',color='red', size=7), x=miniSellOrderDate,
-            #                            y=miniSellOrderStop)
-            # miniSellLimitData = Scatter(name='miniSellLimit',mode='markers', marker=dict(symbol='diamond-open',color='red', size=7), x=miniSellOrderDate,
-            #                             y=miniSellOrderLimit)
-            #
-            # cancelData = Scatter(name='cancel',mode='markers', marker=dict(color='grey', size=7,symbol='cross'), x=cancelDate, y=cancelPrice)
-            #
-            # majorFig = Figure(
-            #     data=[mainData, bolliData,prevThreshData,buyBreakData,buyBarrierData,targetData,miniTargetData,
-            #           buyData, sellData, miniSellData, buyStopData, buyLimitData, sellStopData, sellLimitData,
-            #           miniSellStopData, miniSellLimitData, cancelData],
-            #     layout=Layout(
-            #         xaxis=dict(
-            #             rangeslider=dict(
-            #                 visible=False
-            #             ),
-            #             showgrid=True,
-            #         )))
-            #
-            # print('printing graph...')
-            # plotly.offline.plot(majorFig,
-            #                     # show_link=False,
-            #                     # # output_type='div',
-            #                     # include_plotlyjs=False,
-            #                     filename='charts//'+coin+'_'+str(seed)+'_'+ interval+ '_'+datetime.utcnow().strftime("%d%m%y_%H:%M:%S")+'.html',
-            #                     auto_open=False,
-            #                     config={'displaylogo': False,
-            #                             'modeBarButtonsToRemove': ['sendDataToCloud', 'select2d', 'zoomIn2d',
-            #                                                        'zoomOut2d',
-            #                                                        'resetScale2d', 'hoverCompareCartesian',
-            #                                                        'lasso2d'],
-            #                             'displayModeBar': True
-            #                             })
-            #endregion
+        print('Current USDT', assets)
+        print('Current USDT', assets,file=file)
 
-
-
-            return float(assets)
-
-        print('Case Closed?', case, file=file)
+        #region: Rebalancing
+        if (np.abs(assets-initial_assets)/initial_assets) > rebalancingDeviationThresh:
+            assets = pieChunk(client, piePercent=piePercent)
+            print('Rebalancing. USDT:',assets)
+            print('Rebalancing. USDT:', assets, file=file)
+        #endregion
 
         # Buffer Time
         print('Rest 1 hour', file=file)
-        # print('================================', file=file)
-        # time.sleep(postSellRest)
-        counter += 60
-
-    print('-----END----', file=file)
-    print('USDT', assets, file=file)
-    print('Coin', btcAssets, file=file)
-    print('Final Close', finalClose, file=file)
-    print('TOTAL VALUE', assets + (btcAssets * finalClose), file=file)
-    print(coin, 'TOTAL VALUE', assets + (btcAssets * finalClose), file=file)
-
-    finalValue = assets + (btcAssets * finalClose)
-
-    #region: charts
-    # mainData = Candlestick(open=data.open, high=data.high, low=data.low, close=data.close, x=data.date)
-    #
-    # bolliDate = []
-    # bolliLow = []
-    #
-    # for i, r in data.iterrows():
-    #     if i < 8: continue
-    #
-    #     bolliDate.append(r.date)
-    #     bolliLow.append(bollingerLow(data.iloc[i - 5:i].close))
-    #
-    #
-    # bolliData = Scatter(name='Bolli', x=bolliDate, y=bolliLow, marker=dict(color='navy', size=4))
-    # prevThreshData = Scatter(name='prevLow', x=prevThreshDate, y=prevThreshList, mode='markers',
-    #                          marker=dict(symbol='square', color='red', size=3))
-    # buyBreakData = Scatter(name='buyBreak', x=buyBreakerDate, y=buyBreaker, mode='markers',
-    #                        marker=dict(symbol='square', color='brown', size=3))
-    # buyBarrierData = Scatter(name='buyBar', x=buyBarrierDate, y=buyBarrierList, mode='markers',
-    #                          marker=dict(symbol='square', color='blue', size=3))
-    # targetData = Scatter(name='target', x=targetDate, y=targetList, mode='markers',
-    #                      marker=dict(symbol='triangle-up', color='blue', size=4))
-    # miniTargetData = Scatter(name='miniTarget', x=miniTargetDate, y=miniTargetList, mode='markers',
-    #                          marker=dict(symbol='triangle-up', color='pink', size=3))
-    #
-    # buyData = Scatter(name='Buy', mode='markers', marker=dict(symbol='circle-open-dot', color='royalblue', size=14),
-    #                   x=buyDate, y=buyPriceList)
-    # sellData = Scatter(name='Sell', mode='markers', marker=dict(symbol='circle-open-dot', color='black', size=14),
-    #                    x=sellDate, y=sellPriceList)
-    # miniSellData = Scatter(name='miniSell', mode='markers',
-    #                        marker=dict(symbol='circle-open-dot', color='darkgreen', size=10), x=miniSellDate,
-    #                        y=miniSellPrice)
-    #
-    # buyStopData = Scatter(name='buyStop', mode='markers', marker=dict(symbol='diamond', color='black', size=7),
-    #                       x=buyOrderDate, y=buyOrderStop)
-    # buyLimitData = Scatter(name='buyLimit', mode='markers', marker=dict(symbol='diamond-open', color='black', size=7),
-    #                        x=buyOrderDate, y=buyOrderLimit)
-    #
-    # sellStopData = Scatter(name='sellStop', mode='markers', marker=dict(symbol='diamond', color='orange', size=7),
-    #                        x=sellOrderDate, y=sellOrderStop)
-    # sellLimitData = Scatter(name='sellLimit', mode='markers',
-    #                         marker=dict(symbol='diamond-open', color='orange', size=7), x=sellOrderDate,
-    #                         y=sellOrderLimit)
-    #
-    # miniSellStopData = Scatter(name='miniSellStop', mode='markers', marker=dict(symbol='diamond', color='red', size=7),
-    #                            x=miniSellOrderDate,
-    #                            y=miniSellOrderStop)
-    # miniSellLimitData = Scatter(name='miniSellLimit', mode='markers',
-    #                             marker=dict(symbol='diamond-open', color='red', size=7), x=miniSellOrderDate,
-    #                             y=miniSellOrderLimit)
-    #
-    # cancelData = Scatter(name='cancel', mode='markers', marker=dict(color='grey', size=7, symbol='cross'), x=cancelDate,
-    #                      y=cancelPrice)
-    #
-    # majorFig = Figure(
-    #     data=[mainData, bolliData, prevThreshData, buyBreakData, buyBarrierData, targetData, miniTargetData,
-    #           buyData, sellData, miniSellData, buyStopData, buyLimitData, sellStopData, sellLimitData,
-    #           miniSellStopData, miniSellLimitData, cancelData],
-    #     layout=Layout(
-    #         xaxis=dict(
-    #             rangeslider=dict(
-    #                 visible=False
-    #             ),
-    #             showgrid=True,
-    #         )))
-    #
-    # print('printing graph...')
-    # plotly.offline.plot(majorFig,
-    #                     # show_link=False,
-    #                     # # output_type='div',
-    #                     # include_plotlyjs=False,
-    #                     filename='charts//'+coin + '_' + str(seed) + '_'+interval+ '_' + datetime.utcnow().strftime("%d%m%y_%H:%M:%S") + '.html',
-    #                     auto_open=False,
-    #                     config={'displaylogo': False,
-    #                             'modeBarButtonsToRemove': ['sendDataToCloud', 'select2d', 'zoomIn2d',
-    #                                                        'zoomOut2d',
-    #                                                        'resetScale2d', 'hoverCompareCartesian',
-    #                                                        'lasso2d'],
-    #                             'displayModeBar': True
-    #                             })
-    #endregion
+        time.sleep(postSellRest)
+        print()
 
 
 
-    return finalValue
+
+
+    return
 
 
 
 if __name__ == '__main__':
+    inputs = sys.argv
 
-    markets = ['LTC', 'EOS', 'XLM', 'ZEC', 'BTT', 'ETH', 'QTUM']
-    # markets = ['ZEC', 'BTT', 'ETH', 'QTUM']
-    seeds = [37, 12, 7, 55]
-    # seeds = [7]
+    symbol = inputs[1].upper()
 
-    intervals = [Client.KLINE_INTERVAL_1MINUTE, Client.KLINE_INTERVAL_5MINUTE,Client.KLINE_INTERVAL_15MINUTE,Client.KLINE_INTERVAL_30MINUTE]
-    global data
 
-    for coin in markets:
-        print('MARKET', coin)
+    lubinance(coin=symbol)
 
-        for interval in intervals:
-            print('INTERVAL', interval)
-            avg = 0.0
-            data = pd.read_csv('030619_to_060619_analysis//' + coin + 'USDT_'+interval+'.csv')
-
-            for seed in seeds:
-                assets = 100
-                btcAssets = 0
-                newValue = lubinance(coin, interval = interval, seed=seed)
-
-                print('newValue', newValue)
-
-                avg += newValue
-
-            avg = (avg - (100*len(seeds))) / (len(seeds))
-            print('Average:', avg, '%')
-            print('%%%%%%%%%%%%%%%%%%%%%%%%%')
-            print()
-        print('TTTTTTTTTTTTTTTTTTTTTTTTT')
-        print()
 
 
