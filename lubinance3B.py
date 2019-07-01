@@ -17,6 +17,7 @@ buyBarrierFactor = 0.8
 buyMargin = 0.9975
 sellingMargin = 1.008
 belowBolliPercent = 0.9995
+marginCapPercent = 0.015
 
 gap = 0.9975
 sellStopPercent = 0.9991
@@ -111,6 +112,9 @@ def closedPhase(client, coin, sellPrice=None, margin=None, ):
                 buyPrice = currentPrice
 
                 margin = margin + (buyPrice * feePercent)
+
+                if margin > (marginCapPercent * buyPrice):
+                    margin = marginCapPercent * buyPrice
 
                 usdtBalance = get_asset_balance(client, 'USDT')
                 if assets > usdtBalance:
