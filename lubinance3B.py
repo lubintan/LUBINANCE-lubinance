@@ -19,9 +19,9 @@ sellingMargin = 1.008
 belowBolliPercent = 0.9995
 marginCapPercent = 0.015
 
-gap = 0.9975
-sellStopPercent = 0.9991
-sellLimitPercent = 0.9986
+gap = 0.995 #0.9975
+sellStopPercent = 0.9995 #0.9991
+sellLimitPercent = 0.9990 #0.9986
 postSellRest = 3600  # 1 hour
 
 txFee = 0.001

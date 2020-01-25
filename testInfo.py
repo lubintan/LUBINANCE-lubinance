@@ -9,7 +9,7 @@ LTCUSDT = {}
 XLMUSDT = {}
 ZECUSDT = {}
 
-allData = [BTCUSDT,BCHABCUSDT,BNBUSDT,EOSUSDT,ETHUSDT,LTCUSDT,XLMUSDT,ZECUSDT]
+allData = [BTCUSDT,BNBUSDT,EOSUSDT,ETHUSDT,LTCUSDT,XLMUSDT,ZECUSDT]
 
 folder = 'datasets/'
 
@@ -21,6 +21,7 @@ BTCUSDT['datasets'] = [folder + 'BTCUSDT_1m_1 Dec, 2016-17 Apr, 2019.csv',
 BTCUSDT['uptrendDates'] = [datetime(2017,9,15), datetime(2017,12,18)]
 BTCUSDT['downtrendDates'] = [datetime(2017,12,17), datetime(2018,2,6)]
 BTCUSDT['sidewaysDates'] = [datetime(2018,12,18), datetime(2019,3,13)]
+# BTCUSDT['sidewaysDates'] = [datetime(2019,1,16), datetime(2019,1,17,16)]
 BTCUSDT['randomDates'] = [datetime(2018,7,26), datetime(2019,2,6)]
 BTCUSDT['name'] = 'BTC/USDT'
 

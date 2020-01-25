@@ -133,13 +133,16 @@ def get_historical_klines(symbol, interval, start_str, end_str=None):
 
     return output_data
 
-def getData(symbol, interval):
+def getData(symbol, interval, start,end):
     startTime = time.time()
 
     # symbol = "BTCUSDT"
-    start = "1 Dec, 2016"
-    end = "17 Apr, 2019"
+    # start = str(1559059200000-3600000)
+    # end = "1559318400000"
     # interval = Client.KLINE_INTERVAL_15MINUTE
+
+    # start = "1559520000000"
+    # end= "1559779200000"
 
 
     # create the Binance client, no need for api key
@@ -152,14 +155,17 @@ def getData(symbol, interval):
 
     # klines = client.get_historical_klines(symbol, interval, start, end)
 
+    startStr = '260619'
+    endStr = '280619'
 
     # open a file with filename including symbol, interval and start and end converted to milliseconds
     with open(
-            "{}_{}_{}-{}.csv".format(
+            "{}_to_{}_analysis//{}_{}.csv".format(
+                startStr,
+                endStr,
                 symbol,
                 interval,
-                start,
-                end
+
             ),
             mode='w'  # set file write mode
     ) as f:
@@ -187,15 +193,173 @@ def getData(symbol, interval):
 
 if __name__ == '__main__':
 
-    markets=['BTCUSDT','BNBUSDT','ETHUSDT','BCHABCUSDT','LTCUSDT','EOSUSDT','XLMUSDT','ZECUSDT']
-    intervals = [Client.KLINE_INTERVAL_5MINUTE]
+    # markets=['LTCUSDT','EOSUSDT','XLMUSDT','ZECUSDT','BTTUSDT','ETHUSDT','QTUMUSDT']
+    # # markets = ['ZECUSDT']
+    # intervals = [Client.KLINE_INTERVAL_1MINUTE,Client.KLINE_INTERVAL_5MINUTE, Client.KLINE_INTERVAL_15MINUTE,
+    #              Client.KLINE_INTERVAL_30MINUTE,
+    #              Client.KLINE_INTERVAL_1HOUR]
+    # 
+    # 
+    # for sym in markets:
+    #     for inter in intervals:
+    #         print(sym, 'requesting')
+    # 
+    #         getData(sym,inter)
+    # 
+    #         print(sym, 'done')
+    #         print()
 
+    
+    A = [[1.000551761348488, 'USDT', 'BTC', 'MITH'],
+    [1.000983030239766, 'USDT', 'BTC', 'ATOM'],
+    [1.000661505994268, 'USDT', 'BTC', 'ZRX'],
+    [1.0007296419310914, 'USDT', 'BTC', 'ZEC'],
+    [1.0005816091491004, 'USDT', 'BTC', 'ATOM'],
+    [1.000929214289184, 'USDT', 'BTC', 'ZRX'],
+    [1.0006185692485579, 'USDT', 'ETH', 'BNB'],
+    [1.001447690798754, 'USDT', 'BTC', 'NULS'],
+    [1.0005944967792757, 'USDT', 'ETH', 'BNB'],
+    [1.0006526337655046, 'USDT', 'BTC', 'IOTA'],
+    [1.000517010319798, 'USDT', 'BTC', 'MITH'],
+    [1.0005833789227097, 'USDT', 'BTC', 'BNB'],
+    [1.0007465771812616, 'USDT', 'ETH', 'ZEC'],
+    [1.0005975395896611, 'USDC', 'ETH', 'ZEC'],
+    [1.0005402896000473, 'USDT', 'BTC', 'XMR'],
+    [1.0025039918710987, 'USDT', 'BTC', 'FTM'],
+    [1.0009446284261714, 'USDT', 'ETH', 'NULS'],
+    [1.0008923458388692, 'USDT', 'BTC', 'ZRX'],
+    [1.0006360568989594, 'USDT', 'BTC', 'ZRX'],
+    [1.0006024522602397, 'USDT', 'BTC', 'ZRX'],
+    [1.0008875839537665, 'USDT', 'BTC', 'ZRX'],
+    [1.0009861428462472, 'USDT', 'BTC', 'ZRX'],
+    [1.0010145154402534, 'USDT', 'ETH', 'IOST'],
+    [1.0007765268972388, 'USDT', 'BTC', 'ATOM'],
+    [1.0005169742932178, 'USDT', 'ETH', 'IOST'],
+    [1.0006352476658267, 'USDT', 'BTC', 'IOTA'],
+    [1.0011704518492186, 'USDC', 'BTC', 'ATOM'],
+    [1.0006727117213874, 'USDC', 'BTC', 'ATOM'],
+    [1.00118853900948, 'USDC', 'BTC', 'ATOM'],
+    [1.000769341431225, 'USDT', 'ETH', 'ONT'],
+    [1.0006393198693, 'USDT', 'BTC', 'XLM'],
+    [1.0006929173019241, 'USDT', 'BTC', 'QTUM'],
+    [1.0005239487819657, 'PAX', 'BTC', 'ADA'],
+    [1.0013979742416386, 'USDT', 'BTC', 'MITH'],
+    [1.0005222189053224, 'USDT', 'BTC', 'DASH'],
+    [1.0005364725113954, 'USDT', 'BTC', 'DASH'],
+    [1.0006081888996783, 'USDT', 'BTC', 'FET'],
+    [1.0005628329121057, 'USDT', 'BTC', 'IOTA'],
+    [1.0007372824197183, 'USDC', 'BTC', 'ATOM'],
+    [1.0014620263486294, 'USDC', 'BTC', 'ATOM'],
+    [1.0022620607085548, 'USDC', 'BTC', 'ATOM'],
+    [1.0014014497070298, 'USDC', 'BTC', 'ATOM'],]
 
-    for sym in markets:
-        for inter in intervals:
-            print(sym, 'requesting')
+    B = []
 
-            getData(sym,inter)
+    for each in A:
+        B.append(each[0])
 
-            print(sym, 'done')
-            print()
+    B.sort()
+    B.reverse()
+
+    for el in B:
+        print(el)
+
+    # [1.000551761348488, 'USDT', 'BTC', 'MITH']
+    # [1.000983030239766, 'USDT', 'BTC', 'ATOM']
+    # [1.000661505994268, 'USDT', 'BTC', 'ZRX']
+    # [1.0007296419310914, 'USDT', 'BTC', 'ZEC']
+    # [1.0005816091491004, 'USDT', 'BTC', 'ATOM']
+    # [1.000929214289184, 'USDT', 'BTC', 'ZRX']
+    # [1.0006185692485579, 'USDT', 'ETH', 'BNB']
+    # [1.001447690798754, 'USDT', 'BTC', 'NULS']
+    # [1.0005944967792757, 'USDT', 'ETH', 'BNB']
+    # [1.0006526337655046, 'USDT', 'BTC', 'IOTA']
+    # [1.000517010319798, 'USDT', 'BTC', 'MITH']
+    # [1.0005833789227097, 'USDT', 'BTC', 'BNB']
+    # [1.0007465771812616, 'USDT', 'ETH', 'ZEC']
+    # [1.0005975395896611, 'USDC', 'ETH', 'ZEC']
+    # [1.0005402896000473, 'USDT', 'BTC', 'XMR']
+    # [1.0025039918710987, 'USDT', 'BTC', 'FTM']
+    # [1.0009446284261714, 'USDT', 'ETH', 'NULS']
+    # [1.0008923458388692, 'USDT', 'BTC', 'ZRX']
+    # [1.0006360568989594, 'USDT', 'BTC', 'ZRX']
+    # [1.0006024522602397, 'USDT', 'BTC', 'ZRX']
+    # [1.0008875839537665, 'USDT', 'BTC', 'ZRX']
+    # [1.0009861428462472, 'USDT', 'BTC', 'ZRX']
+    # [1.0010145154402534, 'USDT', 'ETH', 'IOST']
+    # [1.0007765268972388, 'USDT', 'BTC', 'ATOM']
+    # [1.0005169742932178, 'USDT', 'ETH', 'IOST']
+    # [1.0006352476658267, 'USDT', 'BTC', 'IOTA']
+    # [1.0011704518492186, 'USDC', 'BTC', 'ATOM']
+    # [1.0006727117213874, 'USDC', 'BTC', 'ATOM']
+    # [1.00118853900948, 'USDC', 'BTC', 'ATOM']
+    # [1.000769341431225, 'USDT', 'ETH', 'ONT']
+    # [1.0006393198693, 'USDT', 'BTC', 'XLM']
+    # [1.0006929173019241, 'USDT', 'BTC', 'QTUM']
+    # [1.0005239487819657, 'PAX', 'BTC', 'ADA']
+    # [1.0013979742416386, 'USDT', 'BTC', 'MITH']
+    # [1.0005222189053224, 'USDT', 'BTC', 'DASH']
+    # [1.0005364725113954, 'USDT', 'BTC', 'DASH']
+    # [1.0006081888996783, 'USDT', 'BTC', 'FET']
+    # [1.0005628329121057, 'USDT', 'BTC', 'IOTA']
+    # [1.0007372824197183, 'USDC', 'BTC', 'ATOM']
+    # [1.0014620263486294, 'USDC', 'BTC', 'ATOM']
+    # [1.0022620607085548, 'USDC', 'BTC', 'ATOM']
+    # [1.0014014497070298, 'USDC', 'BTC', 'ATOM']
+    #
+    # USDT
+    # BTC
+    # OMG
+    # True
+    # True
+    # True
+    # False
+    # 0.9946
+    # TimeTaken: 0.310480
+    # s
+    # Time
+    # Since
+    # Start: 6:10: 12.709594
+    #
+    # [1.000551761348488, 'USDT', 'BTC', 'MITH']
+    # [1.000983030239766, 'USDT', 'BTC', 'ATOM']
+    # [1.000661505994268, 'USDT', 'BTC', 'ZRX']
+    # [1.0007296419310914, 'USDT', 'BTC', 'ZEC']
+    # [1.0005816091491004, 'USDT', 'BTC', 'ATOM']
+    # [1.000929214289184, 'USDT', 'BTC', 'ZRX']
+    # [1.0006185692485579, 'USDT', 'ETH', 'BNB']
+    # [1.001447690798754, 'USDT', 'BTC', 'NULS']
+    # [1.0005944967792757, 'USDT', 'ETH', 'BNB']
+    # [1.0006526337655046, 'USDT', 'BTC', 'IOTA']
+    # [1.000517010319798, 'USDT', 'BTC', 'MITH']
+    # [1.0005833789227097, 'USDT', 'BTC', 'BNB']
+    # [1.0007465771812616, 'USDT', 'ETH', 'ZEC']
+    # [1.0005975395896611, 'USDC', 'ETH', 'ZEC']
+    # [1.0005402896000473, 'USDT', 'BTC', 'XMR']
+    # [1.0025039918710987, 'USDT', 'BTC', 'FTM']
+    # [1.0009446284261714, 'USDT', 'ETH', 'NULS']
+    # [1.0008923458388692, 'USDT', 'BTC', 'ZRX']
+    # [1.0006360568989594, 'USDT', 'BTC', 'ZRX']
+    # [1.0006024522602397, 'USDT', 'BTC', 'ZRX']
+    # [1.0008875839537665, 'USDT', 'BTC', 'ZRX']
+    # [1.0009861428462472, 'USDT', 'BTC', 'ZRX']
+    # [1.0010145154402534, 'USDT', 'ETH', 'IOST']
+    # [1.0007765268972388, 'USDT', 'BTC', 'ATOM']
+    # [1.0005169742932178, 'USDT', 'ETH', 'IOST']
+    # [1.0006352476658267, 'USDT', 'BTC', 'IOTA']
+    # [1.0011704518492186, 'USDC', 'BTC', 'ATOM']
+    # [1.0006727117213874, 'USDC', 'BTC', 'ATOM']
+    # [1.00118853900948, 'USDC', 'BTC', 'ATOM']
+    # [1.000769341431225, 'USDT', 'ETH', 'ONT']
+    # [1.0006393198693, 'USDT', 'BTC', 'XLM']
+    # [1.0006929173019241, 'USDT', 'BTC', 'QTUM']
+    # [1.0005239487819657, 'PAX', 'BTC', 'ADA']
+    # [1.0013979742416386, 'USDT', 'BTC', 'MITH']
+    # [1.0005222189053224, 'USDT', 'BTC', 'DASH']
+    # [1.0005364725113954, 'USDT', 'BTC', 'DASH']
+    # [1.0006081888996783, 'USDT', 'BTC', 'FET']
+    # [1.0005628329121057, 'USDT', 'BTC', 'IOTA']
+    # [1.0007372824197183, 'USDC', 'BTC', 'ATOM']
+    # [1.0014620263486294, 'USDC', 'BTC', 'ATOM']
+    # [1.0022620607085548, 'USDC', 'BTC', 'ATOM']
+    # [1.0014014497070298, 'USDC', 'BTC', 'ATOM']

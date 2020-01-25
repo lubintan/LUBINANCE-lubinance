@@ -17,9 +17,9 @@ buyMargin = 0.9975
 sellingMargin = 1.008
 belowBolliPercent = 0.9995
 
-gap = 0.9975
-sellStopPercent = 0.9991
-sellLimitPercent =0.9986
+gap = 0.995#0.9975
+sellStopPercent = 0.9995#0.9991
+sellLimitPercent = 0.9990#0.9986
 postSellRest = 3600  # 1 hour
 
 txFee = 0.001
@@ -1052,6 +1052,7 @@ if __name__ == '__main__':
     intervals = [Client.KLINE_INTERVAL_15MINUTE]
     global data
 
+    bigAvg=[]
     for coin in markets:
         print('MARKET', coin)
 
@@ -1070,10 +1071,15 @@ if __name__ == '__main__':
                 avg += newValue
 
             avg = (avg - (100 * len(seeds))) / (len(seeds))
+            bigAvg.append(avg)
             print('Average:', avg, '%')
             print('%%%%%%%%%%%%%%%%%%%%%%%%%')
             print()
         print('TTTTTTTTTTTTTTTTTTTTTTTTT')
         print()
+    print(np.mean(bigAvg))
 
 
+# 0.22527134963241174
+
+# 0.2658649653583061
